@@ -1,0 +1,22 @@
+{
+  "server_port": "8080",
+  "jwt_pub_rsa": "",
+  "force_auth": true,
+  "force_user": true,
+  "mongo_url": "mongodb://localhost:27017",
+  "mongo_table": "importdeploy",
+  "mongo_import_type_collection": "instances",
+  "mongo_repl_set": true,
+  "import_repo_url": "http://localhost:8181",
+  "kafka_bootstrap": "localhost:9092",
+  "deploy_mode": "docker",
+  "docker_network": "bridge",
+  "docker_pull": true,
+  "rancher_url": "http://rancher",
+  "rancher_access_key": "",
+  "rancher_secret_key": "",
+  "rancher_stack_id": "",
+  "rancher_namespace_id": "",
+  "rancher_project_id": "",
+  "debug": true
+}
