@@ -22,7 +22,7 @@ import (
 )
 
 type Controller interface {
-	ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string) (results []model.Instance, err error, errCode int)
+	ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string, asc bool, search string) (results []model.Instance, err error, errCode int)
 	ReadInstance(id string, jwt jwt_http_router.Jwt) (result model.Instance, err error, errCode int)
 	CreateInstance(instance model.Instance, jwt jwt_http_router.Jwt) (result model.Instance, err error, code int)
 	SetInstance(importType model.Instance, jwt jwt_http_router.Jwt) (err error, code int)

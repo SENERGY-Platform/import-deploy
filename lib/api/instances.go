@@ -23,6 +23,8 @@ import (
 	jwt_http_router "github.com/SmartEnergyPlatform/jwt-http-router"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 func init() {
@@ -33,7 +35,33 @@ func InstancesEndpoints(config config.Config, control Controller, router *jwt_ht
 	resource := "/instances"
 
 	router.GET(resource, func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
-		results, err, errCode := control.ListInstances(jwt, 0, 0, "") // TODO
+		limit := request.URL.Query().Get("limit")
+		if limit == "" {
+			limit = "100"
+		}
+		limitInt, err := strconv.ParseInt(limit, 10, 64)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		offset := request.URL.Query().Get("offset")
+		if offset == "" {
+			offset = "0"
+		}
+		offsetInt, err := strconv.ParseInt(offset, 10, 64)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		sort := request.URL.Query().Get("sort")
+		if sort == "" {
+			sort = "name"
+		}
+		orderBy := strings.Split(sort, ".")[0]
+		asc := !strings.HasSuffix(sort, ".desc")
+
+		search := request.URL.Query().Get("search")
+		results, err, errCode := control.ListInstances(jwt, limitInt, offsetInt, orderBy, asc, search)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return

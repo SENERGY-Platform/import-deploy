@@ -21,11 +21,11 @@ import (
 	"errors"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/x/bsonx"
 	"log"
-	"strings"
 )
 
 const idFieldName = "Id"
@@ -81,14 +81,13 @@ func (this *Mongo) GetInstance(ctx context.Context, id string, owner string) (in
 	return instance, true, err
 }
 
-func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, owner string) (result []model.Instance, err error) {
+func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, owner string, asc bool, search string) (result []model.Instance, err error) {
 	opt := options.Find()
 	opt.SetLimit(limit)
 	opt.SetSkip(offset)
 
-	parts := strings.Split(sort, ".")
 	sortby := idKey
-	switch parts[0] {
+	switch sort {
 	case "id":
 		sortby = idKey
 	case "name":
@@ -97,12 +96,14 @@ func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64,
 		sortby = idKey
 	}
 	direction := int32(1)
-	if len(parts) > 1 && parts[1] == "desc" {
+	if !asc {
 		direction = int32(-1)
 	}
 	opt.SetSort(bsonx.Doc{{sortby, bsonx.Int32(direction)}})
 
-	cursor, err := this.instanceCollection().Find(ctx, bson.M{ownerKey: owner}, opt)
+	cursor, err := this.instanceCollection().Find(ctx, bson.M{ownerKey: owner, nameKey: primitive.Regex{
+		Pattern: ".*" + search + ".*",
+	}}, opt)
 	if err != nil {
 		return nil, err
 	}

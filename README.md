@@ -89,6 +89,11 @@ Returns the full Instance
 ```
 GET /instances
 Returns a list of Instances
+Query parameters:
+* search: filter by name
+* limit: limit returned instances (default: 100)
+* offset: offset for pagination (default: 0)
+* sort: field.(asc|desc) for ordering instances (default: name.asc)
 ```
 
 ### Update

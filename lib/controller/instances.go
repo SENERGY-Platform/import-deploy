@@ -30,9 +30,9 @@ import (
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-func (this *Controller) ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string) (results []model.Instance, err error, errCode int) {
+func (this *Controller) ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string, asc bool, search string) (results []model.Instance, err error, errCode int) {
 	ctx, _ := getTimeoutContext()
-	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.UserId)
+	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.UserId, asc, search)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}

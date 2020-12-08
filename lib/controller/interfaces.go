@@ -27,7 +27,7 @@ type Driver interface {
 }
 
 type Database interface {
-	ListInstances(ctx context.Context, limit int64, offset int64, sort string, owner string) (result []model.Instance, err error)
+	ListInstances(ctx context.Context, limit int64, offset int64, sort string, owner string, asc bool, search string) (result []model.Instance, err error)
 	GetInstance(ctx context.Context, id string, owner string) (instance model.Instance, exists bool, err error)
 	SetInstance(ctx context.Context, instance model.Instance, owner string) error
 	RemoveInstance(ctx context.Context, id string, owner string) error
