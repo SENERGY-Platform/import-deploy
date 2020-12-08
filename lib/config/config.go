@@ -38,6 +38,7 @@ type Config struct {
 	MongoTable                string `json:"mongo_table"`
 	MongoImportTypeCollection string `json:"mongo_import_type_collection"`
 	ImportRepoUrl             string `json:"import_repo_url"`
+	PermissionsUrl            string `json:"permissions_url"`
 	KafkaBootstrap            string `json:"kafka_bootstrap"`
 	DeployMode                string `json:"deploy_mode"`
 	DockerNetwork             string `json:"docker_network"`

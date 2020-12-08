@@ -30,7 +30,6 @@ import (
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-
 func (this *Controller) ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string) (results []model.Instance, err error, errCode int) {
 	ctx, _ := getTimeoutContext()
 	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.UserId)
@@ -70,6 +69,14 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt_http_rou
 		return result, err, code
 	}
 
+	access, err := this.hasXAccess(jwt, instance.ImportTypeId)
+	if err != nil {
+		return result, err, http.StatusInternalServerError
+	}
+	if !access {
+		return result, errors.New("no execute access to importType"), http.StatusForbidden
+	}
+
 	env, err := this.getEnv(instance)
 	if err != nil {
 		return result, err, http.StatusBadRequest
@@ -84,7 +91,7 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt_http_rou
 	} else {
 		restart = false
 	}
-	instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix + strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
+	instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}
@@ -114,6 +121,15 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt_http_router
 	if err != nil || code != http.StatusOK {
 		return err, code
 	}
+
+	access, err := this.hasXAccess(jwt, instance.ImportTypeId)
+	if err != nil {
+		return err, http.StatusInternalServerError
+	}
+	if !access {
+		return errors.New("no execute access to importType"), http.StatusForbidden
+	}
+
 	env, err := this.getEnv(instance)
 	if err != nil {
 		return err, http.StatusBadRequest
@@ -125,7 +141,7 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt_http_router
 		restart = false
 	}
 
-	instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix + strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
+	instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
@@ -163,7 +179,6 @@ func (this *Controller) DeleteInstance(id string, jwt jwt_http_router.Jwt) (err 
 	return nil, http.StatusNoContent
 }
 
-
 func (this *Controller) fillDefaultValues(instance model.Instance, jwt jwt_http_router.Jwt) (result model.Instance, err error, code int) {
 	importType, err, code := this.getImportType(instance.ImportTypeId, jwt)
 	if err != nil {
@@ -183,7 +198,7 @@ func (this *Controller) fillDefaultValues(instance model.Instance, jwt jwt_http_
 				Value: typeConf.DefaultValue,
 			})
 		}
-		if (ok && !validateConfig(typeConf, instance.Configs[idx].Value)) || (!ok && !validateConfig(typeConf, instance.Configs[len(instance.Configs) - 1].Value)) {
+		if (ok && !validateConfig(typeConf, instance.Configs[idx].Value)) || (!ok && !validateConfig(typeConf, instance.Configs[len(instance.Configs)-1].Value)) {
 			return instance, errors.New("config value of wrong type"), http.StatusBadRequest
 		}
 	}
@@ -211,7 +226,6 @@ func (this *Controller) getImportType(id string, jwt jwt_http_router.Jwt) (impor
 	err = json.NewDecoder(resp.Body).Decode(&importType)
 	return importType, err, resp.StatusCode
 }
-
 
 func indexOf(list []model.InstanceConfig, element string) (int, bool) {
 	for idx, c := range list {
@@ -274,4 +288,8 @@ func (this *Controller) getEnv(instance model.Instance) (m map[string]string, er
 	m["KAFKA_BOOTSTRAP"] = this.config.KafkaBootstrap
 	m["IMPORT_ID"] = instance.Id
 	return m, nil
+}
+
+func (this *Controller) hasXAccess(jwt jwt_http_router.Jwt, importTypeId string) (bool, error) {
+	return this.checkBool(jwt, "import-types", importTypeId, model.EXECUTE)
 }
