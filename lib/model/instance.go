@@ -31,6 +31,7 @@ type Instance struct {
 }
 
 type InstanceConfig struct {
-	Name  string      `json:"name"`
-	Value interface{} `json:"value"`
+	Name        string      `json:"name"`
+	Value       interface{} `json:"value"`
+	ValueString *string     `json:"-"`
 }

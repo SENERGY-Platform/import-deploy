@@ -18,6 +18,7 @@ package mongo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"go.mongodb.org/mongo-driver/bson"
@@ -78,6 +79,13 @@ func (this *Mongo) GetInstance(ctx context.Context, id string, owner string) (in
 	if err == mongo.ErrNoDocuments {
 		return instance, false, nil
 	}
+	for idx, config := range instance.Configs {
+		err = configToRead(&config)
+		if err != nil {
+			return instance, true, err
+		}
+		instance.Configs[idx] = config
+	}
 	return instance, true, err
 }
 
@@ -108,18 +116,32 @@ func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64,
 		return nil, err
 	}
 	for cursor.Next(context.Background()) {
-		instances := model.Instance{}
-		err = cursor.Decode(&instances)
+		instance := model.Instance{}
+		err = cursor.Decode(&instance)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, instances)
+		for idx, config := range instance.Configs {
+			err = configToRead(&config)
+			if err != nil {
+				return result, err
+			}
+			instance.Configs[idx] = config
+		}
+		result = append(result, instance)
 	}
 	err = cursor.Err()
 	return
 }
 
 func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, owner string) error {
+	for idx, conf := range instance.Configs {
+		err := configToWrite(&conf)
+		if err != nil {
+			return err
+		}
+		instance.Configs[idx] = conf
+	}
 	_, err := this.instanceCollection().ReplaceOne(ctx, bson.M{ownerKey: owner, idKey: instance.Id}, instance, options.Replace().SetUpsert(true))
 	return err
 }
@@ -127,4 +149,39 @@ func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, own
 func (this *Mongo) RemoveInstance(ctx context.Context, id string, owner string) error {
 	_, err := this.instanceCollection().DeleteOne(ctx, bson.M{ownerKey: owner, idKey: id})
 	return err
+}
+
+func configToWrite(config *model.InstanceConfig) error {
+	if config == nil {
+		return errors.New("nil config")
+	}
+	_, valid := config.Value.(map[string]interface{})
+	if !valid {
+		return nil
+	}
+
+	bs, err := json.Marshal(config.Value)
+	if err != nil {
+		return err
+	}
+	s := string(bs)
+	config.ValueString = &s
+	config.Value = nil
+	return nil
+}
+
+func configToRead(config *model.InstanceConfig) error {
+	if config == nil {
+		return errors.New("nil config")
+	}
+	if config.ValueString == nil {
+		return nil
+	}
+	config.Value = map[string]interface{}{}
+	err := json.Unmarshal([]byte(*config.ValueString), &config.Value)
+	if err != nil {
+		return err
+	}
+	config.ValueString = nil
+	return nil
 }
