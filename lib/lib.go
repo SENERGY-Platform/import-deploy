@@ -39,7 +39,7 @@ func Start(conf config.Config) (stop func(), err error) {
 
 	var deploymentClient deploy.DeploymentClient
 
-	switch (conf.DeployMode) {
+	switch conf.DeployMode {
 	case "docker":
 		deploymentClient, err = dockerClient.New(conf)
 		break
@@ -69,16 +69,14 @@ func Start(conf config.Config) (stop func(), err error) {
 
 	err = api.Start(conf, ctrl)
 	if err != nil {
-		data.Disconnect();
+		data.Disconnect()
 		_ = deploymentClient.Disconnect() // best effort
-		_ = kafka.Disconnect() // best effort
 		log.Println("ERROR: unable to start api", err)
 		return stop, err
 	}
 
 	return func() {
 		_ = deploymentClient.Disconnect() // best effort
-		_ = kafka.Disconnect() // best effort
 		data.Disconnect()
 	}, err
 }

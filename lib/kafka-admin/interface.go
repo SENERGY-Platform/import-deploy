@@ -19,5 +19,4 @@ package kafkaAdmin
 type KafkaAdmin interface {
 	CreateTopic(name string) (err error)
 	DeleteTopic(name string) (err error)
-	Disconnect() (err error)
 }
