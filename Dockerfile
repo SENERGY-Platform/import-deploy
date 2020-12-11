@@ -17,4 +17,5 @@ COPY --from=builder /go/src/app/version.txt .
 
 EXPOSE 8080
 
+LABEL org.opencontainers.image.source https://github.com/SENERGY-Platform/import-deploy
 ENTRYPOINT ["./app"]
