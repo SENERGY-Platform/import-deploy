@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"math"
 	"net/http"
-	"reflect"
 	"strings"
 )
 
@@ -131,10 +130,6 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt_http_router
 		return errors.New("no execute access to importType"), http.StatusForbidden
 	}
 
-	existingEnv, err := this.getEnv(existing)
-	if err != nil {
-		return err, http.StatusInternalServerError
-	}
 	env, err := this.getEnv(instance)
 	if err != nil {
 		return err, http.StatusBadRequest
@@ -146,11 +141,9 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt_http_router
 		restart = false
 	}
 
-	if !reflect.DeepEqual(existingEnv, env) || instance.Restart != existing.Restart {
-		instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
-		if err != nil {
-			return err, http.StatusInternalServerError
-		}
+	instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
+	if err != nil {
+		return err, http.StatusInternalServerError
 	}
 	ctx, _ = getTimeoutContext()
 	err = this.db.SetInstance(ctx, instance, jwt.UserId)
