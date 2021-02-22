@@ -25,14 +25,15 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-func (this *Controller) ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string, asc bool, search string) (results []model.Instance, err error, errCode int) {
+func (this *Controller) ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
 	ctx, _ := getTimeoutContext()
-	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.UserId, asc, search)
+	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.UserId, asc, search, includeGenerated)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}
@@ -96,6 +97,9 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt_http_rou
 		return result, err, http.StatusInternalServerError
 	}
 
+	now := time.Now()
+	instance.CreatedAt = now
+	instance.UpdatedAt = now
 	ctx, _ := getTimeoutContext()
 	err = this.db.SetInstance(ctx, instance, jwt.UserId)
 	if err != nil {
@@ -145,6 +149,7 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt_http_router
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
+	instance.UpdatedAt = time.Now()
 	ctx, _ = getTimeoutContext()
 	err = this.db.SetInstance(ctx, instance, jwt.UserId)
 	if err != nil {
@@ -211,6 +216,9 @@ func (this *Controller) fillDefaultValues(instance model.Instance, jwt jwt_http_
 
 func (this *Controller) getImportType(id string, jwt jwt_http_router.Jwt) (importType model.ImportType, err error, code int) {
 	resp, err := jwt.Impersonate.Get(this.config.ImportRepoUrl + "/import-types/" + id)
+	if err != nil {
+		return importType, errors.New("unable to contact import repo"), http.StatusBadGateway
+	}
 	if resp.StatusCode == http.StatusNotFound {
 		return importType, errors.New("unknown import type"), resp.StatusCode
 	}
@@ -219,9 +227,6 @@ func (this *Controller) getImportType(id string, jwt jwt_http_router.Jwt) (impor
 	}
 	if resp.StatusCode != http.StatusOK {
 		return importType, errors.New("unexpected status code"), resp.StatusCode
-	}
-	if err != nil {
-		return importType, err, http.StatusInternalServerError
 	}
 	err = json.NewDecoder(resp.Body).Decode(&importType)
 	return importType, err, resp.StatusCode

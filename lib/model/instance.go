@@ -16,6 +16,8 @@
 
 package model
 
+import "time"
+
 type Instances []Instance
 
 type Instance struct {
@@ -28,6 +30,9 @@ type Instance struct {
 	Restart      *bool            `json:"restart"`
 	ServiceId    string           `json:"-"`
 	Owner        string           `json:"-"`
+	CreatedAt    time.Time        `json:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at"`
+	Generated    bool             `json:"generated"`
 }
 
 type InstanceConfig struct {

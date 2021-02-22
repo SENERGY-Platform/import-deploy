@@ -32,10 +32,16 @@ import (
 const idFieldName = "Id"
 const nameFieldName = "Name"
 const ownerFieldName = "Owner"
+const createdAtFieldName = "CreatedAt"
+const updatedAtFieldName = "UpdatedAt"
+const generatedFieldName = "Generated"
 
 var idKey string
 var nameKey string
 var ownerKey string
+var createdAtKey string
+var updatedAtKey string
+var generatedKey string
 
 func init() {
 	var err error
@@ -48,6 +54,18 @@ func init() {
 		log.Fatal(err)
 	}
 	ownerKey, err = getBsonFieldName(model.Instance{}, ownerFieldName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	createdAtKey, err = getBsonFieldName(model.Instance{}, createdAtFieldName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	updatedAtKey, err = getBsonFieldName(model.Instance{}, updatedAtFieldName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	generatedKey, err = getBsonFieldName(model.Instance{}, generatedFieldName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,7 +107,7 @@ func (this *Mongo) GetInstance(ctx context.Context, id string, owner string) (in
 	return instance, true, err
 }
 
-func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, owner string, asc bool, search string) (result []model.Instance, err error) {
+func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, owner string, asc bool, search string, includeGenerated bool) (result []model.Instance, err error) {
 	opt := options.Find()
 	opt.SetLimit(limit)
 	opt.SetSkip(offset)
@@ -100,6 +118,10 @@ func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64,
 		sortby = idKey
 	case "name":
 		sortby = nameKey
+	case "created_at":
+		sortby = createdAtKey
+	case "updated_at":
+		sortby = updatedAtKey
 	default:
 		sortby = idKey
 	}
@@ -108,10 +130,19 @@ func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64,
 		direction = int32(-1)
 	}
 	opt.SetSort(bsonx.Doc{{sortby, bsonx.Int32(direction)}})
-
-	cursor, err := this.instanceCollection().Find(ctx, bson.M{ownerKey: owner, nameKey: primitive.Regex{
-		Pattern: ".*" + search + ".*",
-	}}, opt)
+	var filter bson.M
+	if includeGenerated {
+		filter = bson.M{ownerKey: owner, nameKey: primitive.Regex{
+			Pattern: ".*" + search + ".*",
+		}}
+	} else {
+		// filter for generatedKey == False || generatedKey == undefined to find legacy instances
+		filter = bson.M{ownerKey: owner, "$or": []bson.M{{generatedKey: false}, {generatedKey: bson.M{"$exists": false}}},
+			nameKey: primitive.Regex{
+				Pattern: ".*" + search + ".*",
+			}}
+	}
+	cursor, err := this.instanceCollection().Find(ctx, filter, opt)
 	if err != nil {
 		return nil, err
 	}

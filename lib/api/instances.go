@@ -31,7 +31,7 @@ func init() {
 	endpoints = append(endpoints, InstancesEndpoints)
 }
 
-func InstancesEndpoints(config config.Config, control Controller, router *jwt_http_router.Router) {
+func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_router.Router) {
 	resource := "/instances"
 
 	router.GET(resource, func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
@@ -61,7 +61,9 @@ func InstancesEndpoints(config config.Config, control Controller, router *jwt_ht
 		asc := !strings.HasSuffix(sort, ".desc")
 
 		search := request.URL.Query().Get("search")
-		results, err, errCode := control.ListInstances(jwt, limitInt, offsetInt, orderBy, asc, search)
+
+		includeGenerated := strings.ToLower(request.URL.Query().Get("exclude_generated")) != "true"
+		results, err, errCode := control.ListInstances(jwt, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return

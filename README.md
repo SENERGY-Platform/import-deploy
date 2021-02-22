@@ -65,7 +65,10 @@ Simply set these environment variables (default values in brackets):
   "configs": InstanceConfig[],
   "restart": bool,
   "service_id": string.
-  "owner": string
+  "owner": string,
+  "generated": bool,  
+  "created_at": string,
+  "updated_at": string
 }
 ```
 
@@ -94,6 +97,7 @@ Query parameters:
 * limit: limit returned instances (default: 100)
 * offset: offset for pagination (default: 0)
 * sort: field.(asc|desc) for ordering instances (default: name.asc)
+* exclude_generated: if set to "true" generated instances will be excluded.
 ```
 
 ### Update
