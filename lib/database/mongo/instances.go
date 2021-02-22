@@ -35,6 +35,7 @@ const ownerFieldName = "Owner"
 const createdAtFieldName = "CreatedAt"
 const updatedAtFieldName = "UpdatedAt"
 const generatedFieldName = "Generated"
+const imageFieldName = "Image"
 
 var idKey string
 var nameKey string
@@ -42,6 +43,7 @@ var ownerKey string
 var createdAtKey string
 var updatedAtKey string
 var generatedKey string
+var imageKey string
 
 func init() {
 	var err error
@@ -66,6 +68,10 @@ func init() {
 		log.Fatal(err)
 	}
 	generatedKey, err = getBsonFieldName(model.Instance{}, generatedFieldName)
+	if err != nil {
+		log.Fatal(err)
+	}
+	imageKey, err = getBsonFieldName(model.Instance{}, imageFieldName)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -122,6 +128,8 @@ func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64,
 		sortby = createdAtKey
 	case "updated_at":
 		sortby = updatedAtKey
+	case "image":
+		sortby = imageKey
 	default:
 		sortby = idKey
 	}
