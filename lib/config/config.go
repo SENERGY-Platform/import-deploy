@@ -49,21 +49,22 @@ type Config struct {
 	RancherStackId            string `json:"rancher_stack_id"`
 	RancherNamespaceId        string `json:"rancher_namespace_id"`
 	RancherProjectId          string `json:"rancher_project_id"`
+	KafkaReplication          int16  `json:"kafka_replication"`
 	Debug                     bool   `json:"debug"`
 }
 
 //loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)
 func Load(location string) (config Config, err error) {
-	file, error := os.Open(location)
-	if error != nil {
-		log.Println("error on config load: ", error)
-		return config, error
+	file, err := os.Open(location)
+	if err != nil {
+		log.Println("err on config load: ", err)
+		return config, err
 	}
 	decoder := json.NewDecoder(file)
-	error = decoder.Decode(&config)
-	if error != nil {
-		log.Println("invalid config json: ", error)
-		return config, error
+	err = decoder.Decode(&config)
+	if err != nil {
+		log.Println("invalid config json: ", err)
+		return config, err
 	}
 	handleEnvironmentVars(&config)
 	return config, nil

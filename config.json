@@ -10,6 +10,7 @@
   "import_repo_url": "http://localhost:8181",
   "permissions_url": "http://permissionsearch:8080",
   "kafka_bootstrap": "localhost:9092",
+  "kafka_replication": 1,
   "deploy_mode": "docker",
   "docker_network": "bridge",
   "docker_pull": true,

@@ -23,6 +23,7 @@ Simply set these environment variables (default values in brackets):
 *    IMPORT_REPO_URL: URL of the [import-repository](https://github.com/SENERGY-Platform/import-repository) (http://localhost:8181)
 *    PERMISSIONS_URL: URL of the [permission-search](https://github.com/SENERGY-Platform/permission-search) (http://permissionsearch:8080)
 *    KAFKA_BOOTSTRAP: address of the kafka broker (localhost:9092)
+*    KAFKA_REPLICATION: number of replicas for newly created topics (1)
 *    DEPLOY_MODE: which backend to use (docker)
   * docker
     * DOCKER_NETWORK: network to start containers in (bridge)

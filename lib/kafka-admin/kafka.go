@@ -43,7 +43,7 @@ func (this *KafkaAdminImpl) CreateTopic(name string) (err error) {
 	topicConfig["retention.ms"] = &minus1
 	detail := sarama.TopicDetail{
 		NumPartitions:     1,
-		ReplicationFactor: 1,
+		ReplicationFactor: this.config.KafkaReplication,
 		ConfigEntries:     topicConfig,
 	}
 	err = admin.CreateTopic(name, &detail, false)
