@@ -49,7 +49,7 @@ type Config struct {
 	RancherStackId            string `json:"rancher_stack_id"`
 	RancherNamespaceId        string `json:"rancher_namespace_id"`
 	RancherProjectId          string `json:"rancher_project_id"`
-	KafkaReplication          int16  `json:"kafka_replication"`
+	KafkaReplication          int64  `json:"kafka_replication"`
 	Debug                     bool   `json:"debug"`
 }
 
