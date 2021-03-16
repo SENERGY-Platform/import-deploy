@@ -39,8 +39,7 @@ func InstancesEndpoints(conf config.Config, control Controller, router *jwt_http
 		if conf.XUserIdForReadAccess {
 			userId = request.Header.Get("X-UserId")
 			if userId == "" {
-				http.Error(writer, "missing header X-UserId", http.StatusBadRequest)
-				return
+				userId = jwt.UserId
 			}
 		} else {
 			userId = jwt.UserId
@@ -91,8 +90,7 @@ func InstancesEndpoints(conf config.Config, control Controller, router *jwt_http
 		if conf.XUserIdForReadAccess {
 			userId = request.Header.Get("X-UserId")
 			if userId == "" {
-				http.Error(writer, "missing header X-UserId", http.StatusBadRequest)
-				return
+				userId = jwt.UserId
 			}
 		} else {
 			userId = jwt.UserId
