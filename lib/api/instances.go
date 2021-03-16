@@ -31,10 +31,20 @@ func init() {
 	endpoints = append(endpoints, InstancesEndpoints)
 }
 
-func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_router.Router) {
+func InstancesEndpoints(conf config.Config, control Controller, router *jwt_http_router.Router) {
 	resource := "/instances"
 
 	router.GET(resource, func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
+		var userId string
+		if conf.XUserIdForReadAccess {
+			userId = request.Header.Get("X-UserId")
+			if userId == "" {
+				http.Error(writer, "missing header X-UserId", http.StatusBadRequest)
+				return
+			}
+		} else {
+			userId = jwt.UserId
+		}
 		limit := request.URL.Query().Get("limit")
 		if limit == "" {
 			limit = "100"
@@ -63,7 +73,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_ro
 		search := request.URL.Query().Get("search")
 
 		includeGenerated := strings.ToLower(request.URL.Query().Get("exclude_generated")) != "true"
-		results, err, errCode := control.ListInstances(jwt, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
+		results, err, errCode := control.ListInstances(userId, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return
@@ -77,8 +87,18 @@ func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_ro
 	})
 
 	router.GET(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
+		var userId string
+		if conf.XUserIdForReadAccess {
+			userId = request.Header.Get("X-UserId")
+			if userId == "" {
+				http.Error(writer, "missing header X-UserId", http.StatusBadRequest)
+				return
+			}
+		} else {
+			userId = jwt.UserId
+		}
 		id := params.ByName("id")
-		result, err, errCode := control.ReadInstance(id, jwt)
+		result, err, errCode := control.ReadInstance(id, userId)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return

@@ -16,6 +16,7 @@ Simply set these environment variables (default values in brackets):
 *    JWT_PUB_RSA: public RSA Key to validate JWTs. If not set, JWTs will not be validated ("")
 *    FORCE_AUTH: whether to enforce authentication (true)
 *    FORCE_USER: whether to enforce a user id in the JWT (true)
+*    X_USER_ID_FOR_READ_ACCESS: whether to use the header X-UserId for user identification on read operations (false)
 *    MONGO_URL: URL of the mongo db (mongodb://localhost:27017)
 *    MONGO_TABLE: mongo db table to use (importdeploy)
 *    MONGO_IMPORT_TYPE_COLLECTION: mongo collection to use (instances)
@@ -117,6 +118,8 @@ Identity is provided by populating the Header "Authorization" with a JWT (prefix
 The token can be validated by providing a public RSA key as config.
 When creating or updating an instance, read and execute access are checked at [import-repository](https://github.com/SENERGY-Platform/import-repository)
 and [permission-search](https://github.com/SENERGY-Platform/permission-search)
+Optionally, you may set the config X_USER_ID_FOR_READ_ACCESS to true in order to relax authentication for read operations.
+The header X-UserId will be used to identify a user instead of reading the user id form the Authorization header.
 
 ## Interactions with [import-repository](https://github.com/SENERGY-Platform/import-repository)
 When creating or updating an instance, the referenced import_type will be read from the [import-repository](https://github.com/SENERGY-Platform/import-repository).
