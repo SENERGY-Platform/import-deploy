@@ -31,18 +31,18 @@ import (
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-func (this *Controller) ListInstances(userId string, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
+func (this *Controller) ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
 	ctx, _ := getTimeoutContext()
-	results, err = this.db.ListInstances(ctx, limit, offset, sort, userId, asc, search, includeGenerated)
+	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.UserId, asc, search, includeGenerated)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}
 	return results, nil, http.StatusOK
 }
 
-func (this *Controller) ReadInstance(id string, userId string) (result model.Instance, err error, errCode int) {
+func (this *Controller) ReadInstance(id string, jwt jwt_http_router.Jwt) (result model.Instance, err error, errCode int) {
 	ctx, _ := getTimeoutContext()
-	result, exists, err := this.db.GetInstance(ctx, id, userId)
+	result, exists, err := this.db.GetInstance(ctx, id, jwt.UserId)
 	if !exists {
 		return result, err, http.StatusNotFound
 	}
