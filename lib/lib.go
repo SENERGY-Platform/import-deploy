@@ -58,7 +58,7 @@ func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err err
 		return wg, err
 	}
 
-	kafka, err := kafkaAdmin.New(conf, ctx, wg)
+	kafka, err := kafkaAdmin.New(conf)
 	if err != nil {
 		return wg, err
 	}
