@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"github.com/SENERGY-Platform/import-deploy/lib"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
@@ -24,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -35,14 +37,26 @@ func main() {
 		log.Fatal("ERROR: unable to load config", err)
 	}
 
-	stop, err := lib.Start(conf)
+	ctx, cancel := context.WithCancel(context.Background())
+	wg, err := lib.Start(conf, ctx)
 	if err != nil {
+		cancel()
+		if wg != nil {
+			wg.Wait()
+		}
 		log.Fatal(err)
 	}
-	defer stop()
 
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-	sig := <-shutdown
-	log.Println("received shutdown signal", sig)
+	var shutdownTime time.Time
+	go func() {
+		shutdown := make(chan os.Signal, 1)
+		signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
+		sig := <-shutdown
+		log.Println("received shutdown signal", sig)
+		shutdownTime = time.Now()
+		cancel()
+	}()
+
+	wg.Wait()
+	log.Println("Shutdown complete, took", time.Since(shutdownTime))
 }

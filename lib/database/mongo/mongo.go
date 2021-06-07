@@ -27,6 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/x/bsonx"
 	"log"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -37,17 +38,22 @@ type Mongo struct {
 
 var CreateCollections = []func(db *Mongo) error{}
 
-func New(conf config.Config) (*Mongo, error) {
-	ctx, _ := getTimeoutContext()
+func New(conf config.Config, ctx context.Context, wg *sync.WaitGroup) (*Mongo, error) {
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(conf.MongoUrl))
 	if err != nil {
 		return nil, err
 	}
+	wg.Add(1)
+	go func() {
+		<-ctx.Done()
+		_ = client.Disconnect(context.Background())
+		wg.Done()
+	}()
 	db := &Mongo{config: conf, client: client}
 	for _, creators := range CreateCollections {
 		err = creators(db)
 		if err != nil {
-			client.Disconnect(context.Background())
+			_ = client.Disconnect(context.Background())
 			return nil, err
 		}
 	}
@@ -132,6 +138,9 @@ func getBsonFieldName(obj interface{}, fieldName string) (bsonName string, err e
 		return "", errors.New("field '" + fieldName + "' not found")
 	}
 	tags, err := bsoncodec.DefaultStructTagParser.ParseStructTags(field)
+	if err != nil {
+		return "", err
+	}
 	return tags.Name, err
 }
 

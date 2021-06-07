@@ -17,6 +17,7 @@
 package lib
 
 import (
+	"context"
 	"errors"
 	"github.com/SENERGY-Platform/import-deploy/lib/api"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
@@ -28,20 +29,21 @@ import (
 	rancher2_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/rancher2-api"
 	kafkaAdmin "github.com/SENERGY-Platform/import-deploy/lib/kafka-admin"
 	"log"
+	"sync"
 )
 
-func Start(conf config.Config) (stop func(), err error) {
-
-	data, err := mongo.New(conf)
+func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err error) {
+	wg = &sync.WaitGroup{}
+	data, err := mongo.New(conf, ctx, wg)
 	if err != nil {
-		return stop, err
+		return wg, err
 	}
 
 	var deploymentClient deploy.DeploymentClient
 
 	switch conf.DeployMode {
 	case "docker":
-		deploymentClient, err = dockerClient.New(conf)
+		deploymentClient, err = dockerClient.New(conf, ctx, wg)
 		break
 	case "rancher1":
 		deploymentClient = rancher_api.New(conf)
@@ -50,33 +52,24 @@ func Start(conf config.Config) (stop func(), err error) {
 		deploymentClient = rancher2_api.New(conf)
 		break
 	default:
-		data.Disconnect()
-		return stop, errors.New("unknown deploy_mode")
+		return wg, errors.New("unknown deploy_mode")
 	}
 	if err != nil {
-		data.Disconnect()
-		return stop, err
+		return wg, err
 	}
 
-	kafka, err := kafkaAdmin.New(conf)
+	kafka, err := kafkaAdmin.New(conf, ctx, wg)
 	if err != nil {
-		data.Disconnect()
-		_ = deploymentClient.Disconnect() // best effort
-		return stop, err
+		return wg, err
 	}
 
 	ctrl := controller.New(conf, data, deploymentClient, kafka)
 
 	err = api.Start(conf, ctrl)
 	if err != nil {
-		data.Disconnect()
-		_ = deploymentClient.Disconnect() // best effort
 		log.Println("ERROR: unable to start api", err)
-		return stop, err
+		return wg, err
 	}
 
-	return func() {
-		_ = deploymentClient.Disconnect() // best effort
-		data.Disconnect()
-	}, err
+	return wg, err
 }

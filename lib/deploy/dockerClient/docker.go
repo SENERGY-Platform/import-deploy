@@ -22,6 +22,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
+	"sync"
 )
 
 type DockerClient struct {
@@ -29,11 +30,17 @@ type DockerClient struct {
 	cli    *docker.Client
 }
 
-func New(config config.Config) (client *DockerClient, err error) {
+func New(config config.Config, ctx context.Context, wg *sync.WaitGroup) (client *DockerClient, err error) {
 	cli, err := docker.NewEnvClient()
 	if err != nil {
 		return nil, err
 	}
+	wg.Add(1)
+	go func() {
+		<-ctx.Done()
+		_ = cli.Close()
+		wg.Done()
+	}()
 	return &DockerClient{config: config, cli: cli}, nil
 }
 
@@ -47,7 +54,7 @@ func (this *DockerClient) CreateContainer(name string, image string, env map[str
 	}
 	dockerEnv := []string{}
 	for k, v := range env {
-		dockerEnv = append(dockerEnv, k + "=" + v)
+		dockerEnv = append(dockerEnv, k+"="+v)
 	}
 	var restartPolicy container.RestartPolicy
 	if restart {
@@ -59,7 +66,7 @@ func (this *DockerClient) CreateContainer(name string, image string, env map[str
 		Image: image,
 		Env:   dockerEnv,
 	}, &container.HostConfig{
-		NetworkMode: container.NetworkMode(this.config.DockerNetwork),
+		NetworkMode:   container.NetworkMode(this.config.DockerNetwork),
 		RestartPolicy: restartPolicy,
 	}, nil, name)
 	if err != nil {
@@ -96,4 +103,3 @@ func (this *DockerClient) RemoveContainer(id string) (err error) {
 func (this *DockerClient) Disconnect() (err error) {
 	return this.cli.Close()
 }
-

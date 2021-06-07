@@ -17,26 +17,37 @@
 package kafkaAdmin
 
 import (
+	"context"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/Shopify/sarama"
+	"sync"
 )
 
 type KafkaAdminImpl struct {
 	config config.Config
+	admin  sarama.ClusterAdmin
 }
 
-func New(config config.Config) (*KafkaAdminImpl, error) {
+func New(config config.Config, ctx context.Context, wg *sync.WaitGroup) (*KafkaAdminImpl, error) {
+	sconfig := sarama.NewConfig()
+	sconfig.Version = sarama.V2_4_0_0
+	admin, err := sarama.NewClusterAdmin([]string{config.KafkaBootstrap}, sconfig)
+	if err != nil {
+		return nil, err
+	}
+	wg.Add(1)
+	go func() {
+		<-ctx.Done()
+		_ = admin.Close()
+		wg.Done()
+	}()
 	return &KafkaAdminImpl{
 		config: config,
+		admin:  admin,
 	}, nil
 }
 
 func (this *KafkaAdminImpl) CreateTopic(name string) (err error) {
-	admin, err := this.getAdmin()
-	if err != nil {
-		return err
-	}
-
 	minus1 := "-1"
 	topicConfig := map[string]*string{}
 	topicConfig["retention.bytes"] = &minus1
@@ -46,27 +57,9 @@ func (this *KafkaAdminImpl) CreateTopic(name string) (err error) {
 		ReplicationFactor: int16(this.config.KafkaReplication),
 		ConfigEntries:     topicConfig,
 	}
-	err = admin.CreateTopic(name, &detail, false)
-	if err != nil {
-		return err
-	}
-	return admin.Close()
+	return this.admin.CreateTopic(name, &detail, false)
 }
 
 func (this *KafkaAdminImpl) DeleteTopic(name string) (err error) {
-	admin, err := this.getAdmin()
-	if err != nil {
-		return err
-	}
-	err = admin.DeleteTopic(name)
-	if err != nil {
-		return err
-	}
-	return admin.Close()
-}
-
-func (this *KafkaAdminImpl) getAdmin() (admin sarama.ClusterAdmin, err error) {
-	sconfig := sarama.NewConfig()
-	sconfig.Version = sarama.V2_4_0_0
-	return sarama.NewClusterAdmin([]string{this.config.KafkaBootstrap}, sconfig)
+	return this.admin.DeleteTopic(name)
 }
