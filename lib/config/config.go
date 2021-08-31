@@ -30,8 +30,6 @@ import (
 type Config struct {
 	ServerPort                string `json:"server_port"`
 	JwtPubRsa                 string `json:"jwt_pub_rsa"`
-	ForceAuth                 bool   `json:"force_auth"`
-	ForceUser                 bool   `json:"force_user"`
 	LogLevel                  string `json:"log_level"` //DEBUG | CALL | NONE
 	MongoUrl                  string `json:"mongo_url"`
 	MongoReplSet              bool   `json:"mongo_repl_set"` //set true if mongodb is configured as replication set or mongos and is able to handle transactions

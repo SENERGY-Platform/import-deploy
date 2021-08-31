@@ -19,20 +19,20 @@ package api
 import (
 	"github.com/SENERGY-Platform/import-deploy/lib/api/util"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
-	"github.com/SmartEnergyPlatform/jwt-http-router"
+	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
 	"reflect"
 	"runtime"
 )
 
-var endpoints = []func(config config.Config, control Controller, router *jwt_http_router.Router){}
+var endpoints = []func(config config.Config, control Controller, router *httprouter.Router){}
 
 func Start(config config.Config, control Controller) (err error) {
 	log.Println("start api")
-	router := jwt_http_router.New(jwt_http_router.JwtConfig{PubRsa: config.JwtPubRsa, ForceAuth: config.ForceAuth, ForceUser: config.ForceUser})
+	router := httprouter.New()
 	log.Println("add heart beat endpoint")
-	router.GET("/", func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
+	router.GET("/", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
 		writer.WriteHeader(http.StatusOK)
 	})
 	for _, e := range endpoints {

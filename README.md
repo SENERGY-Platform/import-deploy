@@ -13,9 +13,7 @@ import-deploy can manage containers in three different backends:
 
 Simply set these environment variables (default values in brackets):
 *    SERVER_PORT: port to listen on (8080)
-*    JWT_PUB_RSA: public RSA Key to validate JWTs. If not set, JWTs will not be validated ("")
-*    FORCE_AUTH: whether to enforce authentication (true)
-*    FORCE_USER: whether to enforce a user id in the JWT (true)
+*    JWT_PUB_RSA: public RSA Key to validate JWTs ("")
 *    MONGO_URL: URL of the mongo db (mongodb://localhost:27017)
 *    MONGO_TABLE: mongo db table to use (importdeploy)
 *    MONGO_IMPORT_TYPE_COLLECTION: mongo collection to use (instances)

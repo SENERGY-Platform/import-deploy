@@ -18,9 +18,10 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	jwt_http_router "github.com/SmartEnergyPlatform/jwt-http-router"
+	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
 	"strconv"
@@ -31,10 +32,15 @@ func init() {
 	endpoints = append(endpoints, InstancesEndpoints)
 }
 
-func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_router.Router) {
+func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.Router) {
 	resource := "/instances"
 
-	router.GET(resource, func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
+	router.GET(resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		token, err := auth.GetParsedToken(request)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
 		limit := request.URL.Query().Get("limit")
 		if limit == "" {
 			limit = "100"
@@ -63,7 +69,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_ro
 		search := request.URL.Query().Get("search")
 
 		includeGenerated := strings.ToLower(request.URL.Query().Get("exclude_generated")) != "true"
-		results, err, errCode := control.ListInstances(jwt, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
+		results, err, errCode := control.ListInstances(token, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return
@@ -76,9 +82,14 @@ func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_ro
 		return
 	})
 
-	router.GET(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
+	router.GET(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		token, err := auth.GetParsedToken(request)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
 		id := params.ByName("id")
-		result, err, errCode := control.ReadInstance(id, jwt)
+		result, err, errCode := control.ReadInstance(id, token)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return
@@ -91,9 +102,14 @@ func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_ro
 		return
 	})
 
-	router.DELETE(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
+	router.DELETE(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		token, err := auth.GetParsedToken(request)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
 		id := params.ByName("id")
-		err, errCode := control.DeleteInstance(id, jwt)
+		err, errCode := control.DeleteInstance(id, token)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return
@@ -102,10 +118,15 @@ func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_ro
 		return
 	})
 
-	router.PUT(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
+	router.PUT(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		token, err := auth.GetParsedToken(request)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
 		id := params.ByName("id")
 		instance := model.Instance{}
-		err := json.NewDecoder(request.Body).Decode(&instance)
+		err = json.NewDecoder(request.Body).Decode(&instance)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
@@ -115,7 +136,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_ro
 			http.Error(writer, "IDs don't match", http.StatusBadRequest)
 			return
 		}
-		err, code := control.SetInstance(instance, jwt)
+		err, code := control.SetInstance(instance, token)
 		if err != nil {
 			http.Error(writer, err.Error(), code)
 			return
@@ -123,14 +144,19 @@ func InstancesEndpoints(_ config.Config, control Controller, router *jwt_http_ro
 		writer.WriteHeader(http.StatusOK)
 	})
 
-	router.POST(resource, func(writer http.ResponseWriter, request *http.Request, params jwt_http_router.Params, jwt jwt_http_router.Jwt) {
-		instance := model.Instance{}
-		err := json.NewDecoder(request.Body).Decode(&instance)
+	router.POST(resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		token, err := auth.GetParsedToken(request)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
-		result, err, code := control.CreateInstance(instance, jwt)
+		instance := model.Instance{}
+		err = json.NewDecoder(request.Body).Decode(&instance)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		result, err, code := control.CreateInstance(instance, token)
 		if err != nil {
 			http.Error(writer, err.Error(), code)
 			return

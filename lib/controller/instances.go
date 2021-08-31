@@ -19,8 +19,8 @@ package controller
 import (
 	"encoding/json"
 	"errors"
+	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	jwt_http_router "github.com/SmartEnergyPlatform/jwt-http-router"
 	"github.com/hashicorp/go-uuid"
 	"math"
 	"net/http"
@@ -31,18 +31,18 @@ import (
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-func (this *Controller) ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
+func (this *Controller) ListInstances(jwt auth.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
 	ctx, _ := getTimeoutContext()
-	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.UserId, asc, search, includeGenerated)
+	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.GetUserId(), asc, search, includeGenerated)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}
 	return results, nil, http.StatusOK
 }
 
-func (this *Controller) ReadInstance(id string, jwt jwt_http_router.Jwt) (result model.Instance, err error, errCode int) {
+func (this *Controller) ReadInstance(id string, jwt auth.Token) (result model.Instance, err error, errCode int) {
 	ctx, _ := getTimeoutContext()
-	result, exists, err := this.db.GetInstance(ctx, id, jwt.UserId)
+	result, exists, err := this.db.GetInstance(ctx, id, jwt.GetUserId())
 	if !exists {
 		return result, err, http.StatusNotFound
 	}
@@ -52,7 +52,7 @@ func (this *Controller) ReadInstance(id string, jwt jwt_http_router.Jwt) (result
 	return result, nil, http.StatusOK
 }
 
-func (this *Controller) CreateInstance(instance model.Instance, jwt jwt_http_router.Jwt) (result model.Instance, err error, code int) {
+func (this *Controller) CreateInstance(instance model.Instance, jwt auth.Token) (result model.Instance, err error, code int) {
 	if instance.Id != "" {
 		return result, errors.New("explicit setting of id not allowed"), http.StatusBadRequest
 	}
@@ -64,7 +64,7 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt_http_rou
 		return result, err, http.StatusInternalServerError
 	}
 	instance.Id = idPrefix + id
-	instance.Owner = jwt.UserId
+	instance.Owner = jwt.GetUserId()
 	instance, err, code = this.fillDefaultValues(instance, jwt)
 	if err != nil || code != http.StatusOK {
 		return result, err, code
@@ -101,23 +101,23 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt_http_rou
 	instance.CreatedAt = now
 	instance.UpdatedAt = now
 	ctx, _ := getTimeoutContext()
-	err = this.db.SetInstance(ctx, instance, jwt.UserId)
+	err = this.db.SetInstance(ctx, instance, jwt.GetUserId())
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}
 	return instance, nil, http.StatusOK
 }
 
-func (this *Controller) SetInstance(instance model.Instance, jwt jwt_http_router.Jwt) (err error, code int) {
+func (this *Controller) SetInstance(instance model.Instance, jwt auth.Token) (err error, code int) {
 	ctx, _ := getTimeoutContext()
-	existing, exists, err := this.db.GetInstance(ctx, instance.Id, jwt.UserId)
+	existing, exists, err := this.db.GetInstance(ctx, instance.Id, jwt.GetUserId())
 	if !exists {
 		return errors.New("not found"), http.StatusNotFound
 	}
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
-	instance.Owner = jwt.UserId
+	instance.Owner = jwt.GetUserId()
 	if existing.ImportTypeId != instance.ImportTypeId {
 		return errors.New("change of import type not supported"), http.StatusBadRequest
 	}
@@ -151,16 +151,16 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt_http_router
 	}
 	instance.UpdatedAt = time.Now()
 	ctx, _ = getTimeoutContext()
-	err = this.db.SetInstance(ctx, instance, jwt.UserId)
+	err = this.db.SetInstance(ctx, instance, jwt.GetUserId())
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
 	return nil, http.StatusOK
 }
 
-func (this *Controller) DeleteInstance(id string, jwt jwt_http_router.Jwt) (err error, errCode int) {
+func (this *Controller) DeleteInstance(id string, jwt auth.Token) (err error, errCode int) {
 	ctx, _ := getTimeoutContext()
-	instance, exists, err := this.db.GetInstance(ctx, id, jwt.UserId)
+	instance, exists, err := this.db.GetInstance(ctx, id, jwt.GetUserId())
 	if !exists {
 		return errors.New("not found"), http.StatusNotFound
 	}
@@ -177,14 +177,14 @@ func (this *Controller) DeleteInstance(id string, jwt jwt_http_router.Jwt) (err 
 		return err, http.StatusInternalServerError
 	}
 
-	err = this.db.RemoveInstance(ctx, id, jwt.UserId)
+	err = this.db.RemoveInstance(ctx, id, jwt.GetUserId())
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
 	return nil, http.StatusNoContent
 }
 
-func (this *Controller) fillDefaultValues(instance model.Instance, jwt jwt_http_router.Jwt) (result model.Instance, err error, code int) {
+func (this *Controller) fillDefaultValues(instance model.Instance, jwt auth.Token) (result model.Instance, err error, code int) {
 	importType, err, code := this.getImportType(instance.ImportTypeId, jwt)
 	if err != nil {
 		return instance, err, code
@@ -214,8 +214,11 @@ func (this *Controller) fillDefaultValues(instance model.Instance, jwt jwt_http_
 	return instance, nil, http.StatusOK
 }
 
-func (this *Controller) getImportType(id string, jwt jwt_http_router.Jwt) (importType model.ImportType, err error, code int) {
-	resp, err := jwt.Impersonate.Get(this.config.ImportRepoUrl + "/import-types/" + id)
+func (this *Controller) getImportType(id string, jwt auth.Token) (importType model.ImportType, err error, code int) {
+	req, err := http.NewRequest("GET", this.config.ImportRepoUrl+"/import-types/"+id, nil)
+	req.Header.Set("Authorization", jwt.Token)
+	resp, err := http.DefaultClient.Do(req)
+
 	if err != nil {
 		return importType, errors.New("unable to contact import repo"), http.StatusBadGateway
 	}
@@ -295,6 +298,6 @@ func (this *Controller) getEnv(instance model.Instance) (m map[string]string, er
 	return m, nil
 }
 
-func (this *Controller) hasXAccess(jwt jwt_http_router.Jwt, importTypeId string) (bool, error) {
+func (this *Controller) hasXAccess(jwt auth.Token, importTypeId string) (bool, error) {
 	return this.checkBool(jwt, "import-types", importTypeId, model.EXECUTE)
 }

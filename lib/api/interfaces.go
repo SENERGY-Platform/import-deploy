@@ -17,14 +17,14 @@
 package api
 
 import (
+	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	"github.com/SmartEnergyPlatform/jwt-http-router"
 )
 
 type Controller interface {
-	ListInstances(jwt jwt_http_router.Jwt, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int)
-	ReadInstance(id string, jwt jwt_http_router.Jwt) (result model.Instance, err error, errCode int)
-	CreateInstance(instance model.Instance, jwt jwt_http_router.Jwt) (result model.Instance, err error, code int)
-	SetInstance(importType model.Instance, jwt jwt_http_router.Jwt) (err error, code int)
-	DeleteInstance(id string, jwt jwt_http_router.Jwt) (err error, errCode int)
+	ListInstances(jwt auth.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int)
+	ReadInstance(id string, jwt auth.Token) (result model.Instance, err error, errCode int)
+	CreateInstance(instance model.Instance, jwt auth.Token) (result model.Instance, err error, code int)
+	SetInstance(importType model.Instance, jwt auth.Token) (err error, code int)
+	DeleteInstance(id string, jwt auth.Token) (err error, errCode int)
 }

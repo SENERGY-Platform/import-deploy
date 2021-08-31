@@ -20,14 +20,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	jwt_http_router "github.com/SmartEnergyPlatform/jwt-http-router"
 	"net/http"
 	"net/url"
 	"runtime/debug"
 )
 
-func (this *Controller) checkBool(jwt jwt_http_router.Jwt, kind string, id string, action model.AuthAction) (allowed bool, err error) {
+func (this *Controller) checkBool(jwt auth.Token, kind string, id string, action model.AuthAction) (allowed bool, err error) {
 	if IsAdmin(jwt) {
 		return true, nil
 	}
@@ -36,7 +36,7 @@ func (this *Controller) checkBool(jwt jwt_http_router.Jwt, kind string, id strin
 		debug.PrintStack()
 		return false, err
 	}
-	req.Header.Set("Authorization", string(jwt.Impersonate))
+	req.Header.Set("Authorization", jwt.Token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		debug.PrintStack()
@@ -56,7 +56,7 @@ func (this *Controller) checkBool(jwt jwt_http_router.Jwt, kind string, id strin
 	return allowed, nil
 }
 
-func IsAdmin(jwt jwt_http_router.Jwt) bool {
+func IsAdmin(jwt auth.Token) bool {
 	return contains(jwt.RealmAccess.Roles, "admin")
 }
 
