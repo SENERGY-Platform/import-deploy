@@ -41,7 +41,7 @@ func Start(config config.Config, control Controller) (err error) {
 	}
 	log.Println("add logging and cors")
 	corsHandler := util.NewCors(router)
-	logger := util.NewLogger(corsHandler, config.LogLevel)
+	logger := util.NewLogger(corsHandler)
 	log.Println("listen on port", config.ServerPort)
 	go func() { log.Println(http.ListenAndServe(":"+config.ServerPort, logger)) }()
 	return nil
