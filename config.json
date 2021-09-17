@@ -1,8 +1,6 @@
 {
   "server_port": "8080",
   "jwt_pub_rsa": "",
-  "force_auth": true,
-  "force_user": true,
   "mongo_url": "mongodb://localhost:27017",
   "mongo_table": "importdeploy",
   "mongo_import_type_collection": "instances",
