@@ -17,11 +17,11 @@
 package rancher2_api
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"net/http"
+	"strconv"
 
 	"github.com/parnurzeal/gorequest"
 )
@@ -47,7 +47,7 @@ func (r *Rancher2) UpdateContainer(id string, name string, image string, env map
 }
 
 func (r *Rancher2) CreateContainer(name string, image string, env map[string]string, restart bool) (id string, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 	reqBody := &Request{
 		Name:        name,
 		NamespaceId: r.namespaceId,
@@ -82,7 +82,7 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 }
 
 func (r *Rancher2) RemoveContainer(id string) (err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey).TLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 	resp, body, e := request.Delete(r.url + "projects/" + r.projectId + "/workloads/deployment:" +
 		r.namespaceId + ":" + id).End()
 	if resp.StatusCode == http.StatusNotFound {
@@ -98,6 +98,30 @@ func (r *Rancher2) RemoveContainer(id string) (err error) {
 		return
 	}
 	return
+}
+
+func (r *Rancher2) ContainerExists(id string) (exists bool, err error) {
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+	resp, _, errs := request.Get(r.url + "projects/" + r.projectId + "/workloads/deployment:" +
+		r.namespaceId + ":" + id).End()
+	if len(errs) > 0 {
+		return false, errs[0]
+	}
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		return false, errors.New("unexpected status " + strconv.Itoa(resp.StatusCode))
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		resp, _, errs = request.Get(r.url + "projects/" + r.projectId + "/workloads/job:" +
+			r.namespaceId + ":" + id).End()
+		if len(errs) > 0 {
+			return false, errs[0]
+		}
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+			return false, errors.New("unexpected status " + strconv.Itoa(resp.StatusCode))
+		}
+		return resp.StatusCode == http.StatusOK, nil
+	}
+	return true, nil
 }
 
 func (r *Rancher2) Disconnect() (err error) {

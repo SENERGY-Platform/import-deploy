@@ -18,5 +18,6 @@
   "rancher_stack_id": "",
   "rancher_namespace_id": "",
   "rancher_project_id": "",
-  "debug": true
+  "debug": true,
+  "startup_ensure_deployed": false
 }

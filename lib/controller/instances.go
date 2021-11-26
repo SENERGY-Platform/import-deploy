@@ -21,7 +21,9 @@ import (
 	"errors"
 	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	"github.com/SENERGY-Platform/import-deploy/lib/util"
 	"github.com/hashicorp/go-uuid"
+	"log"
 	"math"
 	"net/http"
 	"strings"
@@ -32,7 +34,7 @@ const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
 func (this *Controller) ListInstances(jwt auth.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
-	ctx, _ := getTimeoutContext()
+	ctx, _ := util.GetTimeoutContext()
 	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.GetUserId(), asc, search, includeGenerated)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
@@ -41,7 +43,7 @@ func (this *Controller) ListInstances(jwt auth.Token, limit int64, offset int64,
 }
 
 func (this *Controller) ReadInstance(id string, jwt auth.Token) (result model.Instance, err error, errCode int) {
-	ctx, _ := getTimeoutContext()
+	ctx, _ := util.GetTimeoutContext()
 	result, exists, err := this.db.GetInstance(ctx, id, jwt.GetUserId())
 	if !exists {
 		return result, err, http.StatusNotFound
@@ -100,7 +102,7 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt auth.Token) 
 	now := time.Now()
 	instance.CreatedAt = now
 	instance.UpdatedAt = now
-	ctx, _ := getTimeoutContext()
+	ctx, _ := util.GetTimeoutContext()
 	err = this.db.SetInstance(ctx, instance, jwt.GetUserId())
 	if err != nil {
 		return result, err, http.StatusInternalServerError
@@ -109,7 +111,7 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt auth.Token) 
 }
 
 func (this *Controller) SetInstance(instance model.Instance, jwt auth.Token) (err error, code int) {
-	ctx, _ := getTimeoutContext()
+	ctx, _ := util.GetTimeoutContext()
 	existing, exists, err := this.db.GetInstance(ctx, instance.Id, jwt.GetUserId())
 	if !exists {
 		return errors.New("not found"), http.StatusNotFound
@@ -150,7 +152,7 @@ func (this *Controller) SetInstance(instance model.Instance, jwt auth.Token) (er
 		return err, http.StatusInternalServerError
 	}
 	instance.UpdatedAt = time.Now()
-	ctx, _ = getTimeoutContext()
+	ctx, _ = util.GetTimeoutContext()
 	err = this.db.SetInstance(ctx, instance, jwt.GetUserId())
 	if err != nil {
 		return err, http.StatusInternalServerError
@@ -159,7 +161,7 @@ func (this *Controller) SetInstance(instance model.Instance, jwt auth.Token) (er
 }
 
 func (this *Controller) DeleteInstance(id string, jwt auth.Token) (err error, errCode int) {
-	ctx, _ := getTimeoutContext()
+	ctx, _ := util.GetTimeoutContext()
 	instance, exists, err := this.db.GetInstance(ctx, id, jwt.GetUserId())
 	if !exists {
 		return errors.New("not found"), http.StatusNotFound
@@ -182,6 +184,52 @@ func (this *Controller) DeleteInstance(id string, jwt auth.Token) (err error, er
 		return err, http.StatusInternalServerError
 	}
 	return nil, http.StatusNoContent
+}
+
+func (this *Controller) EnsureAllInstancesDeployed() (err error) {
+	var offset int64 = 0
+	var batchSize int64 = 100
+	for {
+		ctx, _ := util.GetTimeoutContext()
+		instances, err := this.db.ListInstances(ctx, batchSize, offset, "name", "", true, "", true)
+		if err != nil {
+			return err
+		}
+		if len(instances) == 0 {
+			return nil // done
+		}
+		offset += int64(len(instances))
+		for _, instance := range instances {
+			exists, err := this.deploymentClient.ContainerExists(instance.ServiceId)
+			if err != nil {
+				return err
+			}
+			if exists {
+				log.Println(instance.Id + " still exists")
+				continue
+			}
+			log.Println("Recreating " + instance.Id)
+			env, err := this.getEnv(instance)
+			if err != nil {
+				return err
+			}
+			var restart bool
+			if instance.Restart == nil || *instance.Restart {
+				restart = true
+			} else {
+				restart = false
+			}
+			instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
+			if err != nil {
+				return err
+			}
+			ctx, _ := util.GetTimeoutContext()
+			err = this.db.SetInstance(ctx, instance, instance.Owner)
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (this *Controller) fillDefaultValues(instance model.Instance, jwt auth.Token) (result model.Instance, err error, code int) {

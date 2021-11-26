@@ -65,6 +65,14 @@ func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err err
 
 	ctrl := controller.New(conf, data, deploymentClient, kafka)
 
+	if conf.StartupEnsureDeployed {
+		log.Println("Restoring missing import containers")
+		err = ctrl.EnsureAllInstancesDeployed()
+		if err != nil {
+			return wg, err
+		}
+	}
+
 	err = api.Start(conf, ctrl)
 	if err != nil {
 		log.Println("ERROR: unable to start api", err)

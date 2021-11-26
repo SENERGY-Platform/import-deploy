@@ -48,6 +48,7 @@ type Config struct {
 	RancherProjectId          string `json:"rancher_project_id"`
 	KafkaReplication          int64  `json:"kafka_replication"`
 	Debug                     bool   `json:"debug"`
+	StartupEnsureDeployed     bool   `json:"startup_ensure_deployed"`
 }
 
 //loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)

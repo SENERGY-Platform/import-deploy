@@ -19,6 +19,7 @@ package dockerClient
 import (
 	"context"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/util"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
@@ -45,7 +46,7 @@ func New(config config.Config, ctx context.Context, wg *sync.WaitGroup) (client 
 }
 
 func (this *DockerClient) CreateContainer(name string, image string, env map[string]string, restart bool) (id string, err error) {
-	ctx := context.Background()
+	ctx, _ := util.GetTimeoutContext()
 	if this.config.DockerPull == true {
 		_, err = this.cli.ImagePull(ctx, image, types.ImagePullOptions{})
 		if err != nil {
@@ -98,6 +99,18 @@ func (this *DockerClient) RemoveContainer(id string) (err error) {
 		return err
 	}
 	return nil
+}
+
+func (this *DockerClient) ContainerExists(id string) (exists bool, err error) {
+	ctx, _ := util.GetTimeoutContext()
+	_, err = this.cli.ContainerInspect(ctx, id)
+	if err != nil {
+		if docker.IsErrNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (this *DockerClient) Disconnect() (err error) {

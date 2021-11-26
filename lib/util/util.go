@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 InfAI (CC SES)
+ * Copyright 2021 InfAI (CC SES)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,13 @@
  * limitations under the License.
  */
 
-package controller
+package util
 
 import (
-	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"context"
+	"time"
 )
 
-type Controller struct {
-	db               Database
-	deploymentClient DeploymentClient
-	kafkaAdmin       KafkaAdmin
-	config           config.Config
-}
-
-func New(config config.Config, db Database, deploymentClient DeploymentClient, kafkaAdmin KafkaAdmin) *Controller {
-	return &Controller{
-		db:               db,
-		deploymentClient: deploymentClient,
-		kafkaAdmin:       kafkaAdmin,
-		config:           config,
-	}
+func GetTimeoutContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), 10*time.Second)
 }

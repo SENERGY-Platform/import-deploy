@@ -18,6 +18,7 @@ package dockerClient
 
 import (
 	"context"
+	"github.com/SENERGY-Platform/import-deploy/lib/util"
 	"github.com/docker/docker/api/types"
 )
 
@@ -26,7 +27,7 @@ func (this *DockerClient) listAllContainers() (containers []types.Container, err
 }
 
 func (this *DockerClient) stopAllContainers() (err error) {
-	ctx := context.Background()
+	ctx, _ := util.GetTimeoutContext()
 
 	containers, err := this.listAllContainers()
 	if err != nil {

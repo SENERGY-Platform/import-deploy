@@ -54,7 +54,6 @@ func (r Rancher) createContainer(name string, image string, env map[string]strin
 
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 
-
 	reqBody := &Request{
 		Type:          "service",
 		Name:          name,
@@ -62,9 +61,9 @@ func (r Rancher) createContainer(name string, image string, env map[string]strin
 		Scale:         1,
 		StartOnCreate: true,
 		LaunchConfig: LaunchConfig{
-			ImageUuid:     "docker:" + image,
-			Environment:   env,
-			Labels:        labels,
+			ImageUuid:   "docker:" + image,
+			Environment: env,
+			Labels:      labels,
 		},
 	}
 
@@ -115,7 +114,7 @@ func (r Rancher) UpdateContainer(id string, name string, image string, env map[s
 			return newId, err
 		}
 		rand := binary.BigEndian.Uint64(bytes)
-		newId, err, code := r.createContainer(name + "-" + strconv.FormatUint(rand, 16), image, env, restart)
+		newId, err, code := r.createContainer(name+"-"+strconv.FormatUint(rand, 16), image, env, restart)
 		if err != nil {
 			return newId, err
 		}
@@ -124,6 +123,18 @@ func (r Rancher) UpdateContainer(id string, name string, image string, env map[s
 			return newId, err
 		}
 	}
+}
+
+func (r Rancher) ContainerExists(id string) (exists bool, err error) {
+	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+	resp, _, errs := request.Get(r.url + "services/" + id).End()
+	if len(errs) > 0 {
+		return false, errs[0]
+	}
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		return false, errors.New("unexpected status " + strconv.Itoa(resp.StatusCode))
+	}
+	return resp.StatusCode == http.StatusOK, nil
 }
 
 func (r Rancher) Disconnect() (err error) {
