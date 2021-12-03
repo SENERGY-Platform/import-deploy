@@ -37,9 +37,10 @@ func (this *KafkaAdminImpl) CreateTopic(name string) (err error) {
 		return err
 	}
 
+	mb10 := "10000000"
 	minus1 := "-1"
 	topicConfig := map[string]*string{}
-	topicConfig["retention.bytes"] = &minus1
+	topicConfig["retention.bytes"] = &mb10
 	topicConfig["retention.ms"] = &minus1
 	detail := sarama.TopicDetail{
 		NumPartitions:     1,
