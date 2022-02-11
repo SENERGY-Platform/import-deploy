@@ -23,8 +23,6 @@ type ImportType struct {
 	Image          string             `json:"image"`
 	DefaultRestart bool               `json:"default_restart"`
 	Configs        []ImportTypeConfig `json:"configs"`
-	AspectIds      []string           `json:"aspect_ids"`
-	FunctionIds    []string           `json:"function_ids"`
 	Owner          string             `json:"owner"`
 }
 
