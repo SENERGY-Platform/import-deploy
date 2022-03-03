@@ -54,7 +54,7 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 		Containers: []Container{{
 			Image:           image,
 			Name:            name,
-			Environment:     env,
+			Env:             env,
 			ImagePullPolicy: "Always",
 		}},
 		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
