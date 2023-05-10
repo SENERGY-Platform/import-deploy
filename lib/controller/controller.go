@@ -18,6 +18,7 @@ package controller
 
 import (
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/permission-search/lib/client"
 )
 
 type Controller struct {
@@ -25,6 +26,7 @@ type Controller struct {
 	deploymentClient DeploymentClient
 	kafkaAdmin       KafkaAdmin
 	config           config.Config
+	permissionsearch client.Client
 }
 
 func New(config config.Config, db Database, deploymentClient DeploymentClient, kafkaAdmin KafkaAdmin) *Controller {
@@ -33,5 +35,6 @@ func New(config config.Config, db Database, deploymentClient DeploymentClient, k
 		deploymentClient: deploymentClient,
 		kafkaAdmin:       kafkaAdmin,
 		config:           config,
+		permissionsearch: client.NewClient(config.PermissionsUrl),
 	}
 }

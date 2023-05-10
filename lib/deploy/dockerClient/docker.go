@@ -69,7 +69,7 @@ func (this *DockerClient) CreateContainer(name string, image string, env map[str
 	}, &container.HostConfig{
 		NetworkMode:   container.NetworkMode(this.config.DockerNetwork),
 		RestartPolicy: restartPolicy,
-	}, nil, name)
+	}, nil, nil, name)
 	if err != nil {
 		return id, err
 	}

@@ -20,6 +20,7 @@ import (
 	"context"
 	"github.com/SENERGY-Platform/import-deploy/lib/util"
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 )
 
 func (this *DockerClient) listAllContainers() (containers []types.Container, err error) {
@@ -35,7 +36,7 @@ func (this *DockerClient) stopAllContainers() (err error) {
 	}
 
 	for _, ct := range containers {
-		if err = this.cli.ContainerStop(ctx, ct.ID, nil); err != nil {
+		if err = this.cli.ContainerStop(ctx, ct.ID, container.StopOptions{}); err != nil {
 			return err
 		}
 	}
@@ -61,7 +62,7 @@ func (this *DockerClient) removeAllContainers() (err error) {
 
 func (this *DockerClient) stopContainer(id string) (err error) {
 	ctx := context.Background()
-	err = this.cli.ContainerStop(ctx, id, nil)
+	err = this.cli.ContainerStop(ctx, id, container.StopOptions{})
 	return err
 }
 

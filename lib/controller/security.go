@@ -17,54 +17,24 @@
 package controller
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	"net/http"
-	"net/url"
-	"runtime/debug"
+	"github.com/SENERGY-Platform/permission-search/lib/client"
 )
 
-func (this *Controller) checkBool(jwt auth.Token, kind string, id string, action model.AuthAction) (allowed bool, err error) {
-	if IsAdmin(jwt) {
+func (this *Controller) checkBool(token auth.Token, kind string, id string, action model.AuthAction) (allowed bool, err error) {
+	if token.IsAdmin() {
 		return true, nil
 	}
-	req, err := http.NewRequest("GET", this.config.PermissionsUrl+"/jwt/check/"+url.QueryEscape(kind)+"/"+url.QueryEscape(id)+"/"+action.String()+"/bool", nil)
-	if err != nil {
-		debug.PrintStack()
+	err = this.permissionsearch.CheckUserOrGroup(token.Jwt(), kind, id, action.String())
+	switch err {
+	case nil:
+		return true, nil
+	case client.ErrAccessDenied:
+		return false, nil
+	case client.ErrNotFound:
+		return false, nil
+	default:
 		return false, err
 	}
-	req.Header.Set("Authorization", jwt.Token)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		debug.PrintStack()
-		return false, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(resp.Body)
-		return false, errors.New(buf.String())
-	}
-	err = json.NewDecoder(resp.Body).Decode(&allowed)
-	if err != nil {
-		debug.PrintStack()
-		return false, err
-	}
-	return allowed, nil
-}
-
-func IsAdmin(jwt auth.Token) bool {
-	return contains(jwt.RealmAccess.Roles, "admin")
-}
-
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }
