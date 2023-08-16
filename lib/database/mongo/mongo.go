@@ -21,10 +21,10 @@ import (
 	"errors"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/x/bsonx"
 	"log"
 	"reflect"
 	"sync"
@@ -105,7 +105,7 @@ func (this *Mongo) ensureIndex(collection *mongo.Collection, indexname string, i
 		direction = 1
 	}
 	_, err := collection.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bsonx.Doc{{indexKey, bsonx.Int32(direction)}},
+		Keys:    bson.D{{indexKey, direction}},
 		Options: options.Index().SetName(indexname).SetUnique(unique),
 	})
 	return err
@@ -117,12 +117,12 @@ func (this *Mongo) ensureCompoundIndex(collection *mongo.Collection, indexname s
 	if asc {
 		direction = 1
 	}
-	keys := []bsonx.Elem{}
+	keys := []bson.E{}
 	for _, key := range indexKeys {
-		keys = append(keys, bsonx.Elem{Key: key, Value: bsonx.Int32(direction)})
+		keys = append(keys, bson.E{Key: key, Value: direction})
 	}
 	_, err := collection.Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys:    bsonx.Doc(keys),
+		Keys:    bson.D(keys),
 		Options: options.Index().SetName(indexname).SetUnique(unique),
 	})
 	return err
