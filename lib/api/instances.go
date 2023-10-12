@@ -82,6 +82,22 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 		return
 	})
 
+	router.GET("/total"+resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
+		token, err := auth.GetParsedToken(request)
+		if err != nil {
+			http.Error(writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		count, err, errCode := control.CountInstances(token)
+		if err != nil {
+			http.Error(writer, err.Error(), errCode)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/txt; charset=utf-8")
+		writer.Write([]byte(strconv.FormatInt(int64(count), 10)))
+	})
+
 	router.GET(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
 		token, err := auth.GetParsedToken(request)
 		if err != nil {

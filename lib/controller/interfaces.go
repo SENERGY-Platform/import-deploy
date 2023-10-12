@@ -31,6 +31,7 @@ type Database interface {
 	GetInstance(ctx context.Context, id string, owner string) (instance model.Instance, exists bool, err error)
 	SetInstance(ctx context.Context, instance model.Instance, owner string) error
 	RemoveInstance(ctx context.Context, id string, owner string) error
+	CountInstances(ctx context.Context, owner string) (count int64, err error)
 }
 
 type DeploymentClient interface {

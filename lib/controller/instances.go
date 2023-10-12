@@ -42,6 +42,15 @@ func (this *Controller) ListInstances(jwt auth.Token, limit int64, offset int64,
 	return results, nil, http.StatusOK
 }
 
+func (this *Controller) CountInstances(jwt auth.Token) (count int64, err error, errCode int) {
+	ctx, _ := util.GetTimeoutContext()
+	count, err = this.db.CountInstances(ctx, jwt.GetUserId())
+	if err != nil {
+		return count, err, http.StatusInternalServerError
+	}
+	return count, nil, http.StatusOK
+}
+
 func (this *Controller) ReadInstance(id string, jwt auth.Token) (result model.Instance, err error, errCode int) {
 	ctx, _ := util.GetTimeoutContext()
 	result, exists, err := this.db.GetInstance(ctx, id, jwt.GetUserId())

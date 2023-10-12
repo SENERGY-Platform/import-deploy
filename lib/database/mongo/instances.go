@@ -192,6 +192,12 @@ func (this *Mongo) RemoveInstance(ctx context.Context, id string, owner string) 
 	return err
 }
 
+func (this *Mongo) CountInstances(ctx context.Context, owner string) (int64, error) {
+	filter := bson.D{{ownerKey, owner}}
+	count, err := this.instanceCollection().CountDocuments(ctx, filter)
+	return count, err
+}
+
 func configToWrite(config *model.InstanceConfig) error {
 	if config == nil {
 		return errors.New("nil config")
