@@ -89,7 +89,10 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 			return
 		}
 
-		count, err, errCode := control.CountInstances(token)
+		search := request.URL.Query().Get("search")
+		includeGenerated := strings.ToLower(request.URL.Query().Get("exclude_generated")) != "true"
+
+		count, err, errCode := control.CountInstances(token, search, includeGenerated)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return

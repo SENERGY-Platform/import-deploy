@@ -27,5 +27,5 @@ type Controller interface {
 	CreateInstance(instance model.Instance, jwt auth.Token) (result model.Instance, err error, code int)
 	SetInstance(importType model.Instance, jwt auth.Token) (err error, code int)
 	DeleteInstance(id string, jwt auth.Token) (err error, errCode int)
-	CountInstances(jwt auth.Token) (count int64, err error, errCode int)
+	CountInstances(jwt auth.Token, search string, includeGenerated bool) (count int64, err error, errCode int)
 }

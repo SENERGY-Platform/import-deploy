@@ -192,8 +192,29 @@ func (this *Mongo) RemoveInstance(ctx context.Context, id string, owner string) 
 	return err
 }
 
-func (this *Mongo) CountInstances(ctx context.Context, owner string) (int64, error) {
+func (this *Mongo) CountInstances(ctx context.Context, owner string, search string, includeGenerated bool) (int64, error) {
 	filter := bson.D{{ownerKey, owner}}
+	if includeGenerated {
+		filter = append(filter, primitive.E{Key: nameKey, Value: primitive.Regex{
+			Pattern: ".*" + search + ".*",
+		}})
+	} else {
+		// filter for generatedKey == False || generatedKey == undefined to find legacy instances
+		filter = append(filter, primitive.E{
+			Key: "$or",
+			Value: []bson.M{
+				{generatedKey: false},
+				{generatedKey: bson.M{"$exists": false}},
+			},
+		})
+
+		filter = append(filter, primitive.E{
+			Key: nameKey,
+			Value: primitive.Regex{
+				Pattern: ".*" + search + ".*",
+			},
+		})
+	}
 	count, err := this.instanceCollection().CountDocuments(ctx, filter)
 	return count, err
 }
