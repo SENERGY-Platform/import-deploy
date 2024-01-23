@@ -136,7 +136,7 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 	}
 
 	autoscaleRequest := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, body, e = request.Post(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers").Send(autoscaleRequest).End()
+	resp, body, e = autoscaleRequest.Post(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers").Send(autoscaleRequestBody).End()
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
 		err = errors.New("could not create import")
 		fmt.Print(body)
