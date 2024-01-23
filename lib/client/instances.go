@@ -48,6 +48,9 @@ func (c *Client) ListInstances(jwt auth.Token, limit int64, offset int64, sort s
 
 func (c *Client) ReadInstance(id string, jwt auth.Token) (result model.Instance, err error, errCode int) {
 	req, err := http.NewRequest(http.MethodGet, c.baseUrl+"/instances/"+id, nil)
+	if err != nil {
+		return result, err, http.StatusBadRequest
+	}
 	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
 	return do[model.Instance](req)
 }
@@ -78,10 +81,25 @@ func (c *Client) SetInstance(importType model.Instance, jwt auth.Token) (err err
 
 func (c *Client) DeleteInstance(id string, jwt auth.Token) (err error, errCode int) {
 	req, err := http.NewRequest(http.MethodDelete, c.baseUrl+"/instances/"+id, nil)
+	if err != nil {
+		return err, http.StatusBadRequest
+	}
 	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
 	return nil, resp.StatusCode
+}
+
+func (c *Client) CountInstances(jwt auth.Token, search string, includeGenerated bool) (count int64, err error, errCode int) {
+	req, err := http.NewRequest(http.MethodGet, c.baseUrl+"/instances"+
+		"?search="+search+
+		"&exclude_generated="+strconv.FormatBool(!includeGenerated),
+		nil)
+	if err != nil {
+		return 0, err, http.StatusBadRequest
+	}
+	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
+	return do[int64](req)
 }
