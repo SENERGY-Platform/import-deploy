@@ -45,7 +45,7 @@ func New(config config.Config, ctx context.Context, wg *sync.WaitGroup) (client 
 	return &DockerClient{config: config, cli: cli}, nil
 }
 
-func (this *DockerClient) CreateContainer(name string, image string, env map[string]string, restart bool) (id string, err error) {
+func (this *DockerClient) CreateContainer(name string, image string, env map[string]string, restart bool, _ string, _ string) (id string, err error) {
 	ctx, _ := util.GetTimeoutContext()
 	if this.config.DockerPull == true {
 		_, err = this.cli.ImagePull(ctx, image, types.ImagePullOptions{})
@@ -81,12 +81,12 @@ func (this *DockerClient) CreateContainer(name string, image string, env map[str
 	return resp.ID, err
 }
 
-func (this *DockerClient) UpdateContainer(id string, name string, image string, env map[string]string, restart bool) (newId string, err error) {
+func (this *DockerClient) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (newId string, err error) {
 	err = this.RemoveContainer(id)
 	if err != nil {
 		return newId, err
 	}
-	return this.CreateContainer(name, image, env, restart)
+	return this.CreateContainer(name, image, env, restart, userid, importTypeId)
 }
 
 func (this *DockerClient) RemoveContainer(id string) (err error) {

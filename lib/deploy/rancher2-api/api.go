@@ -22,6 +22,7 @@ import (
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/parnurzeal/gorequest"
 )
@@ -32,21 +33,24 @@ type Rancher2 struct {
 	secretKey   string
 	namespaceId string
 	projectId   string
+	kubeUrl     string
 }
 
 func New(config config.Config) *Rancher2 {
-	return &Rancher2{config.RancherUrl, config.RancherAccessKey, config.RancherSecretKey, config.RancherNamespaceId, config.RancherProjectId}
+	kubeUrl := strings.TrimSuffix(config.RancherUrl, "v3/") + "k8s/clusters/" +
+		strings.Split(config.RancherProjectId, ":")[0] + "/v1/"
+	return &Rancher2{config.RancherUrl, config.RancherAccessKey, config.RancherSecretKey, config.RancherNamespaceId, config.RancherProjectId, kubeUrl}
 }
 
-func (r *Rancher2) UpdateContainer(id string, name string, image string, env map[string]string, restart bool) (newId string, err error) {
+func (r *Rancher2) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (newId string, err error) {
 	err = r.RemoveContainer(id)
 	if err != nil {
 		return newId, err
 	}
-	return r.CreateContainer(name, image, env, restart)
+	return r.CreateContainer(name, image, env, restart, userid, importTypeId)
 }
 
-func (r *Rancher2) CreateContainer(name string, image string, env map[string]string, restart bool) (id string, err error) {
+func (r *Rancher2) CreateContainer(name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (id string, err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 	r2Env := []Env{}
 	for k, v := range env {
@@ -63,8 +67,49 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 			Name:            name,
 			Env:             r2Env,
 			ImagePullPolicy: "Always",
+			Resources: Resources{
+				Requests: map[string]string{
+					"memory": "128Mi",
+					"cpu":    "100m",
+				},
+				Limits: map[string]string{
+					"memory": "512Mi",
+					"cpu":    "500m",
+				},
+			},
+			Labels: map[string]string{
+				"user":         userid,
+				"importId":     name,
+				"importTypeId": importTypeId,
+			},
 		}},
 		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
+	}
+
+	autoscaleRequestBody := AutoscalingRequest{
+		ApiVersion: "autoscaling.k8s.io/v1",
+		Kind:       "VerticalPodAutoscaler",
+		Metadata: AutoscalingRequestMetadata{
+			Name:      name + "-vpa",
+			Namespace: r.namespaceId,
+		},
+		Spec: AutoscalingRequestSpec{
+			TargetRef: AutoscalingRequestTargetRef{
+				Name: name,
+			},
+			UpdatePolicy: AutoscalingRequestUpdatePolicy{UpdateMode: "Auto"},
+			ResourcePolicy: ResourcePolicy{
+				ContainerPolicies: []ContainerPolicy{
+					{
+						ContainerName: "*",
+						MaxAllowed: MaxAllowed{
+							CPU:    1,
+							Memory: "4000Mi",
+						},
+					},
+				},
+			},
+		},
 	}
 	request.Method = "POST"
 	request.Url = r.url + "projects/" + r.projectId
@@ -72,11 +117,27 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 		request.Url += "/workloads"
 		reqBody.Labels = map[string]string{"import": name}
 		reqBody.Selector = Selector{MatchLabels: map[string]string{"import": name}}
+		autoscaleRequestBody.Spec.TargetRef.ApiVersion = "apps/v1"
+		autoscaleRequestBody.Spec.TargetRef.Kind = "Deployment"
 	} else {
 		request.Url += "/jobs"
+		autoscaleRequestBody.Spec.TargetRef.ApiVersion = "batch/v1"
+		autoscaleRequestBody.Spec.TargetRef.Kind = "Job"
 	}
 	resp, body, e := request.Send(reqBody).End()
 	if resp.StatusCode != http.StatusCreated {
+		err = errors.New("could not create import")
+		fmt.Print(body)
+		return
+	}
+	if len(e) > 0 {
+		err = errors.New("could not create import")
+		return
+	}
+
+	autoscaleRequest := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+	resp, body, e = request.Post(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers").Send(autoscaleRequest).End()
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
 		err = errors.New("could not create import")
 		fmt.Print(body)
 		return
@@ -104,6 +165,37 @@ func (r *Rancher2) RemoveContainer(id string) (err error) {
 		err = errors.New("something went wrong")
 		return
 	}
+
+	autoscaleRequest := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+	resp, body, e = autoscaleRequest.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
+		r.namespaceId +
+		"/" +
+		id + "-vpa").
+		End()
+	if resp.StatusCode != http.StatusNoContent {
+		err = errors.New("rancher2 API - could not delete operator vpa " + body)
+		return
+	}
+	if len(e) > 0 {
+		err = errors.New("something went wrong")
+		return
+	}
+
+	autoscaleCheckpointRequest := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+	resp, body, e = autoscaleCheckpointRequest.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
+		r.namespaceId +
+		"/" +
+		id + "-vpa-" + id).
+		End()
+	if resp.StatusCode != http.StatusNoContent {
+		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
+		return
+	}
+	if len(e) > 0 {
+		err = errors.New("something went wrong")
+		return
+	}
+
 	return
 }
 

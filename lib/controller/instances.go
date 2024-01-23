@@ -103,7 +103,7 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt auth.Token) 
 	} else {
 		restart = false
 	}
-	instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
+	instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId)
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}
@@ -156,7 +156,7 @@ func (this *Controller) SetInstance(instance model.Instance, jwt auth.Token) (er
 		restart = false
 	}
 
-	instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
+	instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
@@ -228,7 +228,7 @@ func (this *Controller) EnsureAllInstancesDeployed() (err error) {
 			} else {
 				restart = false
 			}
-			instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart)
+			instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId)
 			if err != nil {
 				return err
 			}

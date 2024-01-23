@@ -26,11 +26,12 @@ type Request struct {
 }
 
 type Container struct {
-	Image           string    `json:"image,omitempty"`
-	Name            string    `json:"name,omitempty"`
-	Env             []Env     `json:"env,omitempty"`
-	ImagePullPolicy string    `json:"imagePullPolicy,omitempty"`
-	Resources       Resources `json:"resources,omitempty"`
+	Image           string            `json:"image,omitempty"`
+	Name            string            `json:"name,omitempty"`
+	Env             []Env             `json:"env,omitempty"`
+	ImagePullPolicy string            `json:"imagePullPolicy,omitempty"`
+	Resources       Resources         `json:"resources,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
 }
 type Env struct {
 	Name  string `json:"name"`
@@ -38,11 +39,8 @@ type Env struct {
 }
 
 type Resources struct {
-	Limits Limits `json:"limits,omitempty"`
-}
-
-type Limits struct {
-	Cpu string `json:"cpu,omitempty"`
+	Limits   map[string]string `json:"limits,omitempty"`
+	Requests map[string]string `json:"requests,omitempty"`
 }
 
 type Selector struct {
@@ -56,4 +54,46 @@ type Scheduling struct {
 
 type Node struct {
 	RequireAll []string `json:"requireAll,omitempty"`
+}
+
+type AutoscalingRequest struct {
+	ApiVersion string                     `json:"apiVersion,omitempty"`
+	Kind       string                     `json:"kind,omitempty"`
+	Metadata   AutoscalingRequestMetadata `json:"metadata,omitempty"`
+	Spec       AutoscalingRequestSpec     `json:"spec,omitempty"`
+}
+
+type AutoscalingRequestMetadata struct {
+	Name      string `json:"name,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type AutoscalingRequestSpec struct {
+	TargetRef      AutoscalingRequestTargetRef    `json:"targetRef,omitempty"`
+	UpdatePolicy   AutoscalingRequestUpdatePolicy `json:"updatePolicy,omitempty"`
+	ResourcePolicy ResourcePolicy                 `json:"resourcePolicy,omitempty"`
+}
+
+type AutoscalingRequestTargetRef struct {
+	ApiVersion string `json:"apiVersion,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Name       string `json:"name,omitempty"`
+}
+
+type AutoscalingRequestUpdatePolicy struct {
+	UpdateMode string `json:"updateMode,omitempty"`
+}
+
+type ResourcePolicy struct {
+	ContainerPolicies []ContainerPolicy `json:"containerPolicies,omitempty"`
+}
+
+type ContainerPolicy struct {
+	ContainerName string     `json:"containerName,omitempty"`
+	MaxAllowed    MaxAllowed `json:"maxAllowed,omitempty"`
+}
+
+type MaxAllowed struct {
+	CPU    int64  `json:"cpu,omitempty"`
+	Memory string `json:"memory,omitempty"`
 }
