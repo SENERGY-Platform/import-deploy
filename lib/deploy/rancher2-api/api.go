@@ -62,7 +62,7 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 	labels := map[string]string{
 		"user":         userid,
 		"importId":     name,
-		"importTypeId": importTypeId,
+		"importTypeId": strings.ReplaceAll(importTypeId, ":", "_"),
 	}
 	reqBody := &Request{
 		Name:        name,
@@ -117,7 +117,7 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 	request.Url = r.url + "projects/" + r.projectId
 	if restart {
 		request.Url += "/workloads"
-		reqBody.Selector = Selector{MatchLabels: map[string]string{"importId": name}}
+		reqBody.Selector = Selector{MatchLabels: labels}
 		autoscaleRequestBody.Spec.TargetRef.ApiVersion = "apps/v1"
 		autoscaleRequestBody.Spec.TargetRef.Kind = "Deployment"
 	} else {
