@@ -59,6 +59,11 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 			Value: v,
 		})
 	}
+	labels := map[string]string{
+		"user":         userid,
+		"importId":     name,
+		"importTypeId": importTypeId,
+	}
 	reqBody := &Request{
 		Name:        name,
 		NamespaceId: r.namespaceId,
@@ -77,12 +82,9 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 					"cpu":    "500m",
 				},
 			},
-			Labels: map[string]string{
-				"user":         userid,
-				"importId":     name,
-				"importTypeId": importTypeId,
-			},
+			Labels: labels,
 		}},
+		Labels:     labels,
 		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
 	}
 
