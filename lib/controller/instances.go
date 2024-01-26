@@ -33,27 +33,27 @@ import (
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-func (this *Controller) ListInstances(jwt auth.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
+func (this *Controller) ListInstances(userId string, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
 	ctx, _ := util.GetTimeoutContext()
-	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt.GetUserId(), asc, search, includeGenerated)
+	results, err = this.db.ListInstances(ctx, limit, offset, sort, userId, asc, search, includeGenerated)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}
 	return results, nil, http.StatusOK
 }
 
-func (this *Controller) CountInstances(jwt auth.Token, search string, includeGenerated bool) (count int64, err error, errCode int) {
+func (this *Controller) CountInstances(userId string, search string, includeGenerated bool) (count int64, err error, errCode int) {
 	ctx, _ := util.GetTimeoutContext()
-	count, err = this.db.CountInstances(ctx, jwt.GetUserId(), search, includeGenerated)
+	count, err = this.db.CountInstances(ctx, userId, search, includeGenerated)
 	if err != nil {
 		return count, err, http.StatusInternalServerError
 	}
 	return count, nil, http.StatusOK
 }
 
-func (this *Controller) ReadInstance(id string, jwt auth.Token) (result model.Instance, err error, errCode int) {
+func (this *Controller) ReadInstance(id string, userId string) (result model.Instance, err error, errCode int) {
 	ctx, _ := util.GetTimeoutContext()
-	result, exists, err := this.db.GetInstance(ctx, id, jwt.GetUserId())
+	result, exists, err := this.db.GetInstance(ctx, id, userId)
 	if !exists {
 		return result, err, http.StatusNotFound
 	}
@@ -169,9 +169,9 @@ func (this *Controller) SetInstance(instance model.Instance, jwt auth.Token) (er
 	return nil, http.StatusOK
 }
 
-func (this *Controller) DeleteInstance(id string, jwt auth.Token) (err error, errCode int) {
+func (this *Controller) DeleteInstance(id string, userId string) (err error, errCode int) {
 	ctx, _ := util.GetTimeoutContext()
-	instance, exists, err := this.db.GetInstance(ctx, id, jwt.GetUserId())
+	instance, exists, err := this.db.GetInstance(ctx, id, userId)
 	if !exists {
 		return errors.New("not found"), http.StatusNotFound
 	}
@@ -188,7 +188,7 @@ func (this *Controller) DeleteInstance(id string, jwt auth.Token) (err error, er
 		return err, http.StatusInternalServerError
 	}
 
-	err = this.db.RemoveInstance(ctx, id, jwt.GetUserId())
+	err = this.db.RemoveInstance(ctx, id, userId)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}

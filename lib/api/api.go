@@ -17,13 +17,17 @@
 package api
 
 import (
-	"github.com/SENERGY-Platform/import-deploy/lib/api/util"
-	"github.com/SENERGY-Platform/import-deploy/lib/config"
-	"github.com/julienschmidt/httprouter"
+	"errors"
 	"log"
 	"net/http"
 	"reflect"
 	"runtime"
+	"slices"
+	"strings"
+
+	"github.com/SENERGY-Platform/import-deploy/lib/api/util"
+	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/julienschmidt/httprouter"
 )
 
 var endpoints = []func(config config.Config, control Controller, router *httprouter.Router){}
@@ -45,4 +49,16 @@ func Start(config config.Config, control Controller) (err error) {
 	log.Println("listen on port", config.ServerPort)
 	go func() { log.Println(http.ListenAndServe(":"+config.ServerPort, logger)) }()
 	return nil
+}
+
+func getUserId(request *http.Request) (string, error) {
+	forUser := request.URL.Query().Get("for_user")
+	if forUser != "" {
+		roles := strings.Split(request.Header.Get("X-User-Roles"), ", ")
+		if !slices.Contains[[]string](roles, "admin") {
+			return "", errors.New("forbidden")
+		}
+		return forUser, nil
+	}
+	return request.Header.Get("X-UserId"), nil
 }

@@ -19,12 +19,21 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/SENERGY-Platform/import-deploy/lib/api"
 	"io"
 	"net/http"
+
+	"github.com/SENERGY-Platform/import-deploy/lib/auth"
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
 )
 
-type Interface = api.Controller
+type Interface interface {
+	ListInstances(jwt auth.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int)
+	ReadInstance(id string, jwt auth.Token) (result model.Instance, err error, errCode int)
+	CreateInstance(instance model.Instance, jwt auth.Token) (result model.Instance, err error, code int)
+	SetInstance(importType model.Instance, jwt auth.Token) (err error, code int)
+	DeleteInstance(id string, jwt auth.Token) (err error, errCode int)
+	CountInstances(jwt auth.Token, search string, includeGenerated bool) (count int64, err error, errCode int)
+}
 
 type Client struct {
 	baseUrl string
