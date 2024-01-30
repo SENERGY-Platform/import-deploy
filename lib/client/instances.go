@@ -25,7 +25,7 @@ import (
 	"strconv"
 )
 
-func (c *Client) ListInstances(jwt auth.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
+func (c *Client) ListInstances(jwt auth.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, forUser string) (results []model.Instance, err error, errCode int) {
 	if asc {
 		sort += ".asc"
 	} else {
@@ -37,7 +37,8 @@ func (c *Client) ListInstances(jwt auth.Token, limit int64, offset int64, sort s
 		"&offset="+strconv.FormatInt(offset, 10)+
 		"&sort="+sort+
 		"&search="+search+
-		"&exclude_generated="+strconv.FormatBool(!includeGenerated),
+		"&exclude_generated="+strconv.FormatBool(!includeGenerated)+
+		"&for_user="+forUser,
 		nil)
 	if err != nil {
 		return results, err, http.StatusBadRequest
@@ -46,8 +47,8 @@ func (c *Client) ListInstances(jwt auth.Token, limit int64, offset int64, sort s
 	return do[[]model.Instance](req)
 }
 
-func (c *Client) ReadInstance(id string, jwt auth.Token) (result model.Instance, err error, errCode int) {
-	req, err := http.NewRequest(http.MethodGet, c.baseUrl+"/instances/"+id, nil)
+func (c *Client) ReadInstance(id string, jwt auth.Token, forUser string) (result model.Instance, err error, errCode int) {
+	req, err := http.NewRequest(http.MethodGet, c.baseUrl+"/instances/"+id+"&for_user="+forUser, nil)
 	if err != nil {
 		return result, err, http.StatusBadRequest
 	}
@@ -61,6 +62,9 @@ func (c *Client) CreateInstance(instance model.Instance, jwt auth.Token) (result
 		return result, err, http.StatusBadRequest
 	}
 	req, err := http.NewRequest(http.MethodPost, c.baseUrl+"/instances", bytes.NewBuffer(b))
+	if err != nil {
+		return result, err, http.StatusInternalServerError
+	}
 	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
 	return do[model.Instance](req)
 }
@@ -71,6 +75,9 @@ func (c *Client) SetInstance(importType model.Instance, jwt auth.Token) (err err
 		return err, http.StatusBadRequest
 	}
 	req, err := http.NewRequest(http.MethodPost, c.baseUrl+"/instances", bytes.NewBuffer(b))
+	if err != nil {
+		return err, http.StatusInternalServerError
+	}
 	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -79,8 +86,8 @@ func (c *Client) SetInstance(importType model.Instance, jwt auth.Token) (err err
 	return nil, resp.StatusCode
 }
 
-func (c *Client) DeleteInstance(id string, jwt auth.Token) (err error, errCode int) {
-	req, err := http.NewRequest(http.MethodDelete, c.baseUrl+"/instances/"+id, nil)
+func (c *Client) DeleteInstance(id string, jwt auth.Token, forUser string) (err error, errCode int) {
+	req, err := http.NewRequest(http.MethodDelete, c.baseUrl+"/instances/"+id+"&for_user="+forUser, nil)
 	if err != nil {
 		return err, http.StatusBadRequest
 	}
