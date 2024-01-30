@@ -60,5 +60,9 @@ func getUserId(request *http.Request) (string, error) {
 		}
 		return forUser, nil
 	}
-	return request.Header.Get("X-UserId"), nil
+	userid := request.Header.Get("X-UserId")
+	if userid == "" {
+		return "", errors.New("X-UserId not set")
+	}
+	return userid, nil
 }
