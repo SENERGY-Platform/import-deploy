@@ -27,6 +27,7 @@ import (
 
 	"github.com/SENERGY-Platform/import-deploy/lib/api/util"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -60,9 +61,15 @@ func getUserId(request *http.Request) (string, error) {
 		}
 		return forUser, nil
 	}
+
 	userid := request.Header.Get("X-UserId")
-	if userid == "" {
-		return "", errors.New("X-UserId not set")
+	if userid != "" {
+		return userid, nil 
 	}
-	return userid, nil
+
+	token, err := auth.GetParsedToken(request)
+	if err != nil {
+		return "", errors.New("Cant get user id from token " + err.Error())
+	}
+	return token.GetUserId(), nil 
 }
