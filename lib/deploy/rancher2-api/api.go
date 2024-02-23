@@ -158,8 +158,8 @@ func (r *Rancher2) RemoveContainer(id string) (err error) {
 		resp, body, e = request.Delete(r.url + "projects/" + r.projectId + "/workloads/job:" +
 			r.namespaceId + ":" + id).End()
 	}
-	if resp.StatusCode != http.StatusNoContent {
-		err = errors.New("could not delete export: " + body)
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
+		err = errors.New("could not delete import: " + body)
 		return
 	}
 	if len(e) > 0 {
@@ -173,7 +173,7 @@ func (r *Rancher2) RemoveContainer(id string) (err error) {
 		"/" +
 		id + "-vpa").
 		End()
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		err = errors.New("rancher2 API - could not delete operator vpa " + body)
 		return
 	}
@@ -188,7 +188,7 @@ func (r *Rancher2) RemoveContainer(id string) (err error) {
 		"/" +
 		id + "-vpa-" + id).
 		End()
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
 		return
 	}
