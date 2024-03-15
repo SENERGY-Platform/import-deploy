@@ -18,6 +18,7 @@ package api
 
 import (
 	"errors"
+	"github.com/SENERGY-Platform/service-commons/pkg/accesslog"
 	"log"
 	"net/http"
 	"reflect"
@@ -26,8 +27,8 @@ import (
 	"strings"
 
 	"github.com/SENERGY-Platform/import-deploy/lib/api/util"
-	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/auth"
+	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -46,7 +47,7 @@ func Start(config config.Config, control Controller) (err error) {
 	}
 	log.Println("add logging and cors")
 	corsHandler := util.NewCors(router)
-	logger := util.NewLogger(corsHandler)
+	logger := accesslog.New(corsHandler)
 	log.Println("listen on port", config.ServerPort)
 	go func() { log.Println(http.ListenAndServe(":"+config.ServerPort, logger)) }()
 	return nil
@@ -64,12 +65,12 @@ func getUserId(request *http.Request) (string, error) {
 
 	userid := request.Header.Get("X-UserId")
 	if userid != "" {
-		return userid, nil 
+		return userid, nil
 	}
 
 	token, err := auth.GetParsedToken(request)
 	if err != nil {
 		return "", errors.New("Cant get user id from token " + err.Error())
 	}
-	return token.GetUserId(), nil 
+	return token.GetUserId(), nil
 }
