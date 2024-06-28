@@ -74,7 +74,7 @@ func (this *DockerClient) CreateContainer(name string, image string, env map[str
 		return id, err
 	}
 
-	err = this.cli.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{})
+	err = this.cli.ContainerStart(ctx, resp.ID, container.StartOptions{})
 	if err != nil {
 		return id, err
 	}
