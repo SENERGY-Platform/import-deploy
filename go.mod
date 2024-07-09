@@ -4,8 +4,8 @@ go 1.22
 
 require (
 	github.com/IBM/sarama v1.43.2
-	github.com/SENERGY-Platform/permission-search v0.0.14
-	github.com/SENERGY-Platform/service-commons v0.0.0-20240423132428-8eccbc027e71
+	github.com/SENERGY-Platform/permission-search v0.0.16
+	github.com/SENERGY-Platform/service-commons v0.0.0-20240708085423-94423a495d7f
 	github.com/docker/docker v26.1.4+incompatible
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.6.0
