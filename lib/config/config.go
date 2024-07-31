@@ -30,7 +30,7 @@ import (
 type Config struct {
 	ServerPort                string `json:"server_port"`
 	JwtPubRsa                 string `json:"jwt_pub_rsa"`
-	MongoUrl                  string `json:"mongo_url"`
+	MongoUrl                  string `json:"mongo_url" config:"secret"`
 	MongoReplSet              bool   `json:"mongo_repl_set"` //set true if mongodb is configured as replication set or mongos and is able to handle transactions
 	MongoTable                string `json:"mongo_table"`
 	MongoImportTypeCollection string `json:"mongo_import_type_collection"`
@@ -41,8 +41,8 @@ type Config struct {
 	DockerNetwork             string `json:"docker_network"`
 	DockerPull                bool   `json:"docker_pull"`
 	RancherUrl                string `json:"rancher_url"`
-	RancherAccessKey          string `json:"rancher_access_key"`
-	RancherSecretKey          string `json:"rancher_secret_key"`
+	RancherAccessKey          string `json:"rancher_access_key" config:"secret"`
+	RancherSecretKey          string `json:"rancher_secret_key" config:"secret"`
 	RancherStackId            string `json:"rancher_stack_id"`
 	RancherNamespaceId        string `json:"rancher_namespace_id"`
 	RancherProjectId          string `json:"rancher_project_id"`
@@ -51,7 +51,7 @@ type Config struct {
 	StartupEnsureDeployed     bool   `json:"startup_ensure_deployed"`
 }
 
-//loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)
+// loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)
 func Load(location string) (config Config, err error) {
 	file, err := os.Open(location)
 	if err != nil {
@@ -89,10 +89,13 @@ func handleEnvironmentVars(config *Config) {
 	configType := configValue.Type()
 	for index := 0; index < configType.NumField(); index++ {
 		fieldName := configType.Field(index).Name
+		fieldConfig := configType.Field(index).Tag.Get("config")
 		envName := fieldNameToEnvName(fieldName)
 		envValue := os.Getenv(envName)
 		if envValue != "" {
-			fmt.Println("use environment variable: ", envName, " = ", envValue)
+			if !strings.Contains(fieldConfig, "secret") {
+				fmt.Println("use environment variable: ", envName, " = ", envValue)
+			}
 			if configValue.FieldByName(fieldName).Kind() == reflect.Int64 {
 				i, _ := strconv.ParseInt(envValue, 10, 64)
 				configValue.FieldByName(fieldName).SetInt(i)
