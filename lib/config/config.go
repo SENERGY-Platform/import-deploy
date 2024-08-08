@@ -49,6 +49,7 @@ type Config struct {
 	KafkaReplication          int64  `json:"kafka_replication"`
 	Debug                     bool   `json:"debug"`
 	StartupEnsureDeployed     bool   `json:"startup_ensure_deployed"`
+	PermissionV2Url           string `json:"permissions_v2_url"`
 }
 
 // loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)

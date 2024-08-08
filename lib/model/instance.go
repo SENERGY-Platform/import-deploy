@@ -17,6 +17,7 @@
 package model
 
 import "time"
+import permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 
 type Instances []Instance
 
@@ -39,4 +40,21 @@ type InstanceConfig struct {
 	Name        string      `json:"name"`
 	Value       interface{} `json:"value"`
 	ValueString *string     `json:"-"`
+}
+
+const PermV2InstanceTopic = "import-instances"
+
+func SetDefaultPermissions(instance Instance, permissions permV2Client.ResourcePermissions) {
+	permissions.UserPermissions[instance.Owner] = permV2Client.PermissionsMap{
+		Read:         true,
+		Write:        true,
+		Execute:      true,
+		Administrate: true,
+	}
+	permissions.GroupPermissions["admin"] = permV2Client.PermissionsMap{
+		Read:         true,
+		Write:        true,
+		Execute:      true,
+		Administrate: true,
+	}
 }

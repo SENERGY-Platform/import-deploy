@@ -22,7 +22,7 @@ import (
 	"github.com/SENERGY-Platform/import-deploy/lib/api"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/controller"
-	"github.com/SENERGY-Platform/import-deploy/lib/database/mongo"
+	"github.com/SENERGY-Platform/import-deploy/lib/database"
 	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
 	"github.com/SENERGY-Platform/import-deploy/lib/deploy/dockerClient"
 	rancher_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/rancher-api"
@@ -34,7 +34,7 @@ import (
 
 func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err error) {
 	wg = &sync.WaitGroup{}
-	data, err := mongo.New(conf, ctx, wg)
+	data, err := database.New(conf, ctx, wg)
 	if err != nil {
 		return wg, err
 	}

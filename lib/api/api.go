@@ -17,17 +17,15 @@
 package api
 
 import (
-	"errors"
-	"github.com/SENERGY-Platform/service-commons/pkg/accesslog"
 	"log"
 	"net/http"
 	"reflect"
 	"runtime"
-	"slices"
-	"strings"
+
+	"github.com/SENERGY-Platform/service-commons/pkg/accesslog"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 
 	"github.com/SENERGY-Platform/import-deploy/lib/api/util"
-	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/julienschmidt/httprouter"
 )
@@ -53,24 +51,10 @@ func Start(config config.Config, control Controller) (err error) {
 	return nil
 }
 
-func getUserId(request *http.Request) (string, error) {
-	forUser := request.URL.Query().Get("for_user")
-	if forUser != "" {
-		roles := strings.Split(request.Header.Get("X-User-Roles"), ", ")
-		if !slices.Contains[[]string](roles, "admin") {
-			return "", errors.New("forbidden")
-		}
-		return forUser, nil
-	}
-
-	userid := request.Header.Get("X-UserId")
-	if userid != "" {
-		return userid, nil
-	}
-
-	token, err := auth.GetParsedToken(request)
+func getToken(request *http.Request) (token jwt.Token, err error) {
+	token, err = jwt.GetParsedToken(request)
 	if err != nil {
-		return "", errors.New("Cant get user id from token " + err.Error())
+		return token, err
 	}
-	return token.GetUserId(), nil
+	return token, nil
 }

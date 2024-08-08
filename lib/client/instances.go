@@ -19,13 +19,13 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"net/http"
 	"strconv"
 )
 
-func (c *Client) ListInstances(jwt auth.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, forUser string) (results []model.Instance, err error, errCode int) {
+func (c *Client) ListInstances(jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, forUser string) (results []model.Instance, err error, errCode int) {
 	if asc {
 		sort += ".asc"
 	} else {
@@ -47,7 +47,7 @@ func (c *Client) ListInstances(jwt auth.Token, limit int64, offset int64, sort s
 	return do[[]model.Instance](req)
 }
 
-func (c *Client) ReadInstance(id string, jwt auth.Token, forUser string) (result model.Instance, err error, errCode int) {
+func (c *Client) ReadInstance(id string, jwt jwt.Token, forUser string) (result model.Instance, err error, errCode int) {
 	req, err := http.NewRequest(http.MethodGet, c.baseUrl+"/instances/"+id+"&for_user="+forUser, nil)
 	if err != nil {
 		return result, err, http.StatusBadRequest
@@ -56,7 +56,7 @@ func (c *Client) ReadInstance(id string, jwt auth.Token, forUser string) (result
 	return do[model.Instance](req)
 }
 
-func (c *Client) CreateInstance(instance model.Instance, jwt auth.Token) (result model.Instance, err error, code int) {
+func (c *Client) CreateInstance(instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int) {
 	b, err := json.Marshal(instance)
 	if err != nil {
 		return result, err, http.StatusBadRequest
@@ -69,7 +69,7 @@ func (c *Client) CreateInstance(instance model.Instance, jwt auth.Token) (result
 	return do[model.Instance](req)
 }
 
-func (c *Client) SetInstance(importType model.Instance, jwt auth.Token) (err error, code int) {
+func (c *Client) SetInstance(importType model.Instance, jwt jwt.Token) (err error, code int) {
 	b, err := json.Marshal(importType)
 	if err != nil {
 		return err, http.StatusBadRequest
@@ -86,7 +86,7 @@ func (c *Client) SetInstance(importType model.Instance, jwt auth.Token) (err err
 	return nil, resp.StatusCode
 }
 
-func (c *Client) DeleteInstance(id string, jwt auth.Token, forUser string) (err error, errCode int) {
+func (c *Client) DeleteInstance(id string, jwt jwt.Token, forUser string) (err error, errCode int) {
 	req, err := http.NewRequest(http.MethodDelete, c.baseUrl+"/instances/"+id+"&for_user="+forUser, nil)
 	if err != nil {
 		return err, http.StatusBadRequest
@@ -99,7 +99,7 @@ func (c *Client) DeleteInstance(id string, jwt auth.Token, forUser string) (err 
 	return nil, resp.StatusCode
 }
 
-func (c *Client) CountInstances(jwt auth.Token, search string, includeGenerated bool) (count int64, err error, errCode int) {
+func (c *Client) CountInstances(jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int) {
 	req, err := http.NewRequest(http.MethodGet, c.baseUrl+"/instances"+
 		"?search="+search+
 		"&exclude_generated="+strconv.FormatBool(!includeGenerated),

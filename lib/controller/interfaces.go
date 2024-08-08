@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 )
 
 type Driver interface {
@@ -27,11 +28,11 @@ type Driver interface {
 }
 
 type Database interface {
-	ListInstances(ctx context.Context, limit int64, offset int64, sort string, owner string, asc bool, search string, includeGenerated bool) (result []model.Instance, err error)
-	GetInstance(ctx context.Context, id string, owner string) (instance model.Instance, exists bool, err error)
-	SetInstance(ctx context.Context, instance model.Instance, owner string) error
-	RemoveInstance(ctx context.Context, id string, owner string) error
-	CountInstances(ctx context.Context, owner string, search string, includeGenerated bool) (count int64, err error)
+	ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool) (result []model.Instance, err error)
+	GetInstance(ctx context.Context, id string, jwt jwt.Token) (instance model.Instance, exists bool, err error)
+	SetInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error
+	RemoveInstance(ctx context.Context, id string, jwt jwt.Token) error
+	CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (count int64, err error)
 }
 
 type DeploymentClient interface {

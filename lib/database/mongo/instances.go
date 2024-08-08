@@ -20,12 +20,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
+	"net/http"
+
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
 )
 
 const idFieldName = "Id"
@@ -89,8 +93,15 @@ func (this *Mongo) instanceCollection() *mongo.Collection {
 	return this.client.Database(this.config.MongoTable).Collection(this.config.MongoImportTypeCollection)
 }
 
-func (this *Mongo) GetInstance(ctx context.Context, id string, owner string) (instance model.Instance, exists bool, err error) {
-	result := this.instanceCollection().FindOne(ctx, bson.M{ownerKey: owner, idKey: id})
+func (this *Mongo) GetInstance(ctx context.Context, id string, jwt jwt.Token) (instance model.Instance, exists bool, err error) {
+	ok, err, _ := this.perm.CheckPermission(jwt.Token, model.PermV2InstanceTopic, id, permV2Client.Read)
+	if err != nil {
+		return instance, false, err
+	}
+	if !ok {
+		return instance, false, errors.New("requested instance nonexistent")
+	}
+	result := this.instanceCollection().FindOne(ctx, bson.M{idKey: id})
 	err = result.Err()
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -112,9 +123,23 @@ func (this *Mongo) GetInstance(ctx context.Context, id string, owner string) (in
 	return instance, true, err
 }
 
-func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, owner string, asc bool, search string, includeGenerated bool) (result []model.Instance, err error) {
+func (this *Mongo) AdminListInstances(ctx context.Context, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (result []model.Instance, err error) {
+	return this.listInstances(ctx, limit, offset, sort, asc, search, includeGenerated, []string{}, true)
+}
+
+func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool) (result []model.Instance, err error) {
+	ids, err, _ := this.perm.ListAccessibleResourceIds(jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
+	if err != nil {
+		return nil, err
+	}
+	return this.listInstances(ctx, limit, offset, sort, asc, search, includeGenerated, ids, false)
+}
+
+func (this *Mongo) listInstances(ctx context.Context, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string, ignoreIdFilter bool) (result []model.Instance, err error) {
 	opt := options.Find()
-	opt.SetLimit(limit)
+	if limit != -1 {
+		opt.SetLimit(limit)
+	}
 	opt.SetSkip(offset)
 
 	sortby := idKey
@@ -149,8 +174,8 @@ func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64,
 				Pattern: ".*" + search + ".*",
 			}}
 	}
-	if owner != "" {
-		filter[ownerKey] = owner
+	if !ignoreIdFilter {
+		filter[idKey] = bson.M{"$in": ids}
 	}
 	cursor, err := this.instanceCollection().Find(ctx, filter, opt)
 	if err != nil {
@@ -175,7 +200,7 @@ func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64,
 	return
 }
 
-func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, owner string) error {
+func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error {
 	for idx, conf := range instance.Configs {
 		err := configToWrite(&conf)
 		if err != nil {
@@ -183,17 +208,45 @@ func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, own
 		}
 		instance.Configs[idx] = conf
 	}
-	_, err := this.instanceCollection().ReplaceOne(ctx, bson.M{ownerKey: owner, idKey: instance.Id}, instance, options.Replace().SetUpsert(true))
+	_, err := this.instanceCollection().ReplaceOne(ctx, bson.M{ownerKey: instance.Owner, idKey: instance.Id}, instance, options.Replace().SetUpsert(true))
+	if err != nil {
+		return err
+	}
+	permissions := permV2Client.ResourcePermissions{
+		GroupPermissions: map[string]permV2Client.PermissionsMap{},
+		UserPermissions:  map[string]permV2Client.PermissionsMap{},
+	}
+	permResource, err, code := this.perm.GetResource(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id)
+	if err != nil && code != http.StatusNotFound {
+		return err
+	}
+	if code == http.StatusOK {
+		permissions.GroupPermissions = permResource.GroupPermissions
+		permissions.UserPermissions = permResource.UserPermissions
+	}
+	model.SetDefaultPermissions(instance, permissions)
+	_, err, _ = this.perm.SetPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions, permV2Client.SetPermissionOptions{})
 	return err
 }
 
-func (this *Mongo) RemoveInstance(ctx context.Context, id string, owner string) error {
-	_, err := this.instanceCollection().DeleteOne(ctx, bson.M{ownerKey: owner, idKey: id})
+func (this *Mongo) RemoveInstance(ctx context.Context, id string, jwt jwt.Token) error {
+	ok, err, _ := this.perm.CheckPermission(jwt.Token, model.PermV2InstanceTopic, id, permV2Client.Administrate)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("requested instance nonexistent or missing rights")
+	}
+	_, err = this.instanceCollection().DeleteOne(ctx, bson.M{idKey: id})
 	return err
 }
 
-func (this *Mongo) CountInstances(ctx context.Context, owner string, search string, includeGenerated bool) (int64, error) {
-	filter := bson.D{{ownerKey, owner}}
+func (this *Mongo) CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (int64, error) {
+	ids, err, _ := this.perm.ListAccessibleResourceIds(jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
+	if err != nil {
+		return 0, err
+	}
+	filter := bson.D{{Key: idKey, Value: bson.M{"$in": ids}}}
 	if includeGenerated {
 		filter = append(filter, primitive.E{Key: nameKey, Value: primitive.Regex{
 			Pattern: ".*" + search + ".*",

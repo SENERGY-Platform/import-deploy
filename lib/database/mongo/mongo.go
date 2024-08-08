@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
@@ -34,11 +35,12 @@ import (
 type Mongo struct {
 	config config.Config
 	client *mongo.Client
+	perm   permV2Client.Client
 }
 
 var CreateCollections = []func(db *Mongo) error{}
 
-func New(conf config.Config, ctx context.Context, wg *sync.WaitGroup) (*Mongo, error) {
+func New(perm permV2Client.Client, conf config.Config, ctx context.Context, wg *sync.WaitGroup) (*Mongo, error) {
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(conf.MongoUrl))
 	if err != nil {
 		return nil, err
@@ -49,7 +51,7 @@ func New(conf config.Config, ctx context.Context, wg *sync.WaitGroup) (*Mongo, e
 		_ = client.Disconnect(context.Background())
 		wg.Done()
 	}()
-	db := &Mongo{config: conf, client: client}
+	db := &Mongo{config: conf, client: client, perm: perm}
 	for _, creators := range CreateCollections {
 		err = creators(db)
 		if err != nil {

@@ -17,12 +17,12 @@
 package controller
 
 import (
-	"github.com/SENERGY-Platform/import-deploy/lib/auth"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"github.com/SENERGY-Platform/permission-search/lib/client"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 )
 
-func (this *Controller) checkBool(token auth.Token, kind string, id string, action model.AuthAction) (allowed bool, err error) {
+func (this *Controller) checkBool(token jwt.Token, kind string, id string, action model.AuthAction) (allowed bool, err error) {
 	if token.IsAdmin() {
 		return true, nil
 	}

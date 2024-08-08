@@ -18,14 +18,14 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/SENERGY-Platform/import-deploy/lib/auth"
-	"github.com/SENERGY-Platform/import-deploy/lib/config"
-	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	"github.com/julienschmidt/httprouter"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	"github.com/julienschmidt/httprouter"
 )
 
 func init() {
@@ -36,7 +36,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 	resource := "/instances"
 
 	router.GET(resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		userId, err := getUserId(request)
+		token, err := getToken(request)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
@@ -69,7 +69,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 		search := request.URL.Query().Get("search")
 
 		includeGenerated := strings.ToLower(request.URL.Query().Get("exclude_generated")) != "true"
-		results, err, errCode := control.ListInstances(userId, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
+		results, err, errCode := control.ListInstances(token, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return
@@ -83,7 +83,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 	})
 
 	router.GET("/total"+resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		userId, err := getUserId(request)
+		token, err := getToken(request)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
@@ -92,7 +92,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 		search := request.URL.Query().Get("search")
 		includeGenerated := strings.ToLower(request.URL.Query().Get("exclude_generated")) != "true"
 
-		count, err, errCode := control.CountInstances(userId, search, includeGenerated)
+		count, err, errCode := control.CountInstances(token, search, includeGenerated)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return
@@ -102,13 +102,13 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 	})
 
 	router.GET(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		userId, err := getUserId(request)
+		token, err := getToken(request)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
 		id := params.ByName("id")
-		result, err, errCode := control.ReadInstance(id, userId)
+		result, err, errCode := control.ReadInstance(id, token)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return
@@ -122,13 +122,13 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 	})
 
 	router.DELETE(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		userId, err := getUserId(request)
+		token, err := getToken(request)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
 		id := params.ByName("id")
-		err, errCode := control.DeleteInstance(id, userId)
+		err, errCode := control.DeleteInstance(id, token)
 		if err != nil {
 			http.Error(writer, err.Error(), errCode)
 			return
@@ -138,7 +138,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 	})
 
 	router.PUT(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		token, err := auth.GetParsedToken(request)
+		token, err := getToken(request)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
@@ -164,7 +164,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.
 	})
 
 	router.POST(resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		token, err := auth.GetParsedToken(request)
+		token, err := getToken(request)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
