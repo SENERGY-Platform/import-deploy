@@ -114,7 +114,7 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt.Token) (
 	instance.CreatedAt = now
 	instance.UpdatedAt = now
 	ctx, _ := util.GetTimeoutContext()
-	err = this.db.SetInstance(ctx, instance, jwt)
+	err = this.db.CreateInstance(ctx, instance, jwt)
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}

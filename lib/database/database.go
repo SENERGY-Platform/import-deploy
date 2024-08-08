@@ -44,7 +44,7 @@ func New(conf config.Config, ctx context.Context, wg *sync.WaitGroup) (db Databa
 }
 
 func migrate(db *mongo.Mongo, perm permV2Client.Client, ctx context.Context) error {
-	log.Println("stat permv2 migration")
+	log.Println("start permv2 migration")
 	perm.SetTopic(permV2Client.InternalAdminToken, permV2Client.Topic{
 		Id:     model.PermV2InstanceTopic,
 		NoCqrs: true,

@@ -81,6 +81,10 @@ func init() {
 
 	CreateCollections = append(CreateCollections, func(db *Mongo) error {
 		collection := db.client.Database(db.config.MongoTable).Collection(db.config.MongoImportTypeCollection)
+		err = db.ensureIndex(collection, "instanceIdindex", idKey, true, true)
+		if err != nil {
+			return err
+		}
 		err = db.ensureCompoundIndex(collection, "instanceOwnerIdindex", true, true, ownerKey, idKey)
 		if err != nil {
 			return err
@@ -200,7 +204,7 @@ func (this *Mongo) listInstances(ctx context.Context, limit int64, offset int64,
 	return
 }
 
-func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error {
+func (this *Mongo) CreateInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error {
 	for idx, conf := range instance.Configs {
 		err := configToWrite(&conf)
 		if err != nil {
@@ -208,7 +212,7 @@ func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, jwt
 		}
 		instance.Configs[idx] = conf
 	}
-	_, err := this.instanceCollection().ReplaceOne(ctx, bson.M{ownerKey: instance.Owner, idKey: instance.Id}, instance, options.Replace().SetUpsert(true))
+	_, err := this.instanceCollection().InsertOne(ctx, instance)
 	if err != nil {
 		return err
 	}
@@ -226,6 +230,28 @@ func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, jwt
 	}
 	model.SetDefaultPermissions(instance, permissions)
 	_, err, _ = this.perm.SetPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions, permV2Client.SetPermissionOptions{})
+	return err
+}
+
+func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error {
+	ok, err, _ := this.perm.CheckPermission(jwt.Token, model.PermV2InstanceTopic, instance.Id, permV2Client.Write)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("requested instance nonexistent or missing rights")
+	}
+	for idx, conf := range instance.Configs {
+		err := configToWrite(&conf)
+		if err != nil {
+			return err
+		}
+		instance.Configs[idx] = conf
+	}
+	_, err = this.instanceCollection().ReplaceOne(ctx, bson.M{idKey: instance.Id}, instance, options.Replace().SetUpsert(true))
+	if err != nil {
+		return err
+	}
 	return err
 }
 
