@@ -18,6 +18,7 @@ package database
 
 import (
 	"context"
+	model2 "github.com/SENERGY-Platform/permissions-v2/pkg/model"
 	"log"
 	"slices"
 	"sync"
@@ -45,10 +46,12 @@ func New(conf config.Config, ctx context.Context, wg *sync.WaitGroup) (db Databa
 
 func migrate(db *mongo.Mongo, perm permV2Client.Client, ctx context.Context) error {
 	log.Println("start permv2 migration")
-	perm.SetTopic(permV2Client.InternalAdminToken, permV2Client.Topic{
-		Id:     model.PermV2InstanceTopic,
-		NoCqrs: true,
+	_, err, _ := perm.SetTopic(permV2Client.InternalAdminToken, permV2Client.Topic{
+		Id: model.PermV2InstanceTopic,
 	})
+	if err != nil {
+		return err
+	}
 
 	instances, err := db.AdminListInstances(ctx, -1, 0, "", true, "", true)
 	if err != nil {
@@ -68,16 +71,21 @@ func migrate(db *mongo.Mongo, perm permV2Client.Client, ctx context.Context) err
 	for _, instance := range instances {
 		dbIds = append(dbIds, instance.Id)
 
-		permissions := permV2Client.ResourcePermissions{UserPermissions: map[string]permV2Client.PermissionsMap{}, GroupPermissions: map[string]permV2Client.PermissionsMap{}}
+		permissions := permV2Client.ResourcePermissions{
+			UserPermissions:  map[string]permV2Client.PermissionsMap{},
+			GroupPermissions: map[string]permV2Client.PermissionsMap{},
+			RolePermissions:  map[string]model2.PermissionsMap{},
+		}
 		resource, ok := permResouceMap[instance.Id]
 		if ok {
 			permissions.UserPermissions = resource.ResourcePermissions.UserPermissions
 			permissions.GroupPermissions = resource.GroupPermissions
+			permissions.RolePermissions = resource.ResourcePermissions.RolePermissions
 		}
 
 		model.SetDefaultPermissions(instance, permissions)
 
-		_, err, _ = perm.SetPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions, permV2Client.SetPermissionOptions{})
+		_, err, _ = perm.SetPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions)
 		if err != nil {
 			return err
 		}

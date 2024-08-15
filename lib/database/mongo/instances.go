@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	model2 "github.com/SENERGY-Platform/permissions-v2/pkg/model"
 	"log"
 	"net/http"
 
@@ -219,6 +220,7 @@ func (this *Mongo) CreateInstance(ctx context.Context, instance model.Instance, 
 	permissions := permV2Client.ResourcePermissions{
 		GroupPermissions: map[string]permV2Client.PermissionsMap{},
 		UserPermissions:  map[string]permV2Client.PermissionsMap{},
+		RolePermissions:  map[string]model2.PermissionsMap{},
 	}
 	permResource, err, code := this.perm.GetResource(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id)
 	if err != nil && code != http.StatusNotFound {
@@ -227,9 +229,10 @@ func (this *Mongo) CreateInstance(ctx context.Context, instance model.Instance, 
 	if code == http.StatusOK {
 		permissions.GroupPermissions = permResource.GroupPermissions
 		permissions.UserPermissions = permResource.UserPermissions
+		permissions.RolePermissions = permResource.RolePermissions
 	}
 	model.SetDefaultPermissions(instance, permissions)
-	_, err, _ = this.perm.SetPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions, permV2Client.SetPermissionOptions{})
+	_, err, _ = this.perm.SetPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions)
 	return err
 }
 
