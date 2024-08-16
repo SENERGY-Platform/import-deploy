@@ -28,28 +28,29 @@ import (
 )
 
 type Config struct {
-	ServerPort                string `json:"server_port"`
-	JwtPubRsa                 string `json:"jwt_pub_rsa"`
-	MongoUrl                  string `json:"mongo_url" config:"secret"`
-	MongoReplSet              bool   `json:"mongo_repl_set"` //set true if mongodb is configured as replication set or mongos and is able to handle transactions
-	MongoTable                string `json:"mongo_table"`
-	MongoImportTypeCollection string `json:"mongo_import_type_collection"`
-	ImportRepoUrl             string `json:"import_repo_url"`
-	PermissionsUrl            string `json:"permissions_url"`
-	KafkaBootstrap            string `json:"kafka_bootstrap"`
-	DeployMode                string `json:"deploy_mode"`
-	DockerNetwork             string `json:"docker_network"`
-	DockerPull                bool   `json:"docker_pull"`
-	RancherUrl                string `json:"rancher_url"`
-	RancherAccessKey          string `json:"rancher_access_key" config:"secret"`
-	RancherSecretKey          string `json:"rancher_secret_key" config:"secret"`
-	RancherStackId            string `json:"rancher_stack_id"`
-	RancherNamespaceId        string `json:"rancher_namespace_id"`
-	RancherProjectId          string `json:"rancher_project_id"`
-	KafkaReplication          int64  `json:"kafka_replication"`
-	Debug                     bool   `json:"debug"`
-	StartupEnsureDeployed     bool   `json:"startup_ensure_deployed"`
-	PermissionV2Url           string `json:"permissions_v2_url"`
+	ServerPort                            string `json:"server_port"`
+	JwtPubRsa                             string `json:"jwt_pub_rsa"`
+	MongoUrl                              string `json:"mongo_url" config:"secret"`
+	MongoReplSet                          bool   `json:"mongo_repl_set"` //set true if mongodb is configured as replication set or mongos and is able to handle transactions
+	MongoTable                            string `json:"mongo_table"`
+	MongoImportTypeCollection             string `json:"mongo_import_type_collection"`
+	ImportRepoUrl                         string `json:"import_repo_url"`
+	PermissionsUrl                        string `json:"permissions_url"`
+	KafkaBootstrap                        string `json:"kafka_bootstrap"`
+	DeployMode                            string `json:"deploy_mode"`
+	DockerNetwork                         string `json:"docker_network"`
+	DockerPull                            bool   `json:"docker_pull"`
+	RancherUrl                            string `json:"rancher_url"`
+	RancherAccessKey                      string `json:"rancher_access_key" config:"secret"`
+	RancherSecretKey                      string `json:"rancher_secret_key" config:"secret"`
+	RancherStackId                        string `json:"rancher_stack_id"`
+	RancherNamespaceId                    string `json:"rancher_namespace_id"`
+	RancherProjectId                      string `json:"rancher_project_id"`
+	KafkaReplication                      int64  `json:"kafka_replication"`
+	Debug                                 bool   `json:"debug"`
+	StartupEnsureDeployed                 bool   `json:"startup_ensure_deployed"`
+	PermissionV2Url                       string `json:"permissions_v2_url"`
+	MigrationUpdateAllInstancePermissions bool   `json:"migration_update_all_instance_permissions"`
 }
 
 // loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)

@@ -20,5 +20,6 @@
   "rancher_project_id": "",
   "debug": true,
   "startup_ensure_deployed": false,
-  "permissions_v2_url": "http://permv2.permissions:8080"
+  "permissions_v2_url": "http://permv2.permissions:8080",
+  "migration_update_all_instance_permissions": false
 }

@@ -37,21 +37,37 @@ func New(conf config.Config, ctx context.Context, wg *sync.WaitGroup) (db Databa
 		return db, err
 	}
 	db = mong
-	err = migrate(mong, perm, ctx)
+	err = migrate(conf, mong, perm, ctx)
 	if err != nil {
 		return db, err
 	}
 	return
 }
 
-func migrate(db *mongo.Mongo, perm permV2Client.Client, ctx context.Context) error {
-	log.Println("start permv2 migration")
+func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ctx context.Context) error {
+	log.Println("ensure permissions-v2 topic")
 	_, err, _ := perm.SetTopic(permV2Client.InternalAdminToken, permV2Client.Topic{
 		Id: model.PermV2InstanceTopic,
+		DefaultPermissions: permV2Client.ResourcePermissions{
+			RolePermissions: map[string]model2.PermissionsMap{
+				"admin": {
+					Read:         true,
+					Write:        true,
+					Execute:      true,
+					Administrate: true,
+				},
+			},
+		},
 	})
 	if err != nil {
 		return err
 	}
+
+	if !config.MigrationUpdateAllInstancePermissions {
+		return nil
+	}
+
+	log.Println("migrating instance permissions")
 
 	instances, err := db.AdminListInstances(ctx, -1, 0, "", true, "", true)
 	if err != nil {
@@ -100,8 +116,10 @@ func migrate(db *mongo.Mongo, perm permV2Client.Client, ctx context.Context) err
 			if err != nil {
 				return err
 			}
-			log.Println(permResouceId, "exists only in permv2, now deleted")
+			log.Println(permResouceId, "exists only in permissions-v2, now deleted")
 		}
 	}
+
+	log.Println("migration finished")
 	return nil
 }

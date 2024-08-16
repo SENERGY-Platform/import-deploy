@@ -51,10 +51,4 @@ func SetDefaultPermissions(instance Instance, permissions permV2Client.ResourceP
 		Execute:      true,
 		Administrate: true,
 	}
-	permissions.RolePermissions["admin"] = permV2Client.PermissionsMap{
-		Read:         true,
-		Write:        true,
-		Execute:      true,
-		Administrate: true,
-	}
 }
