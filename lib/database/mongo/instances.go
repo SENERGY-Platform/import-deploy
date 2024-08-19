@@ -266,6 +266,10 @@ func (this *Mongo) RemoveInstance(ctx context.Context, id string, jwt jwt.Token)
 	if !ok {
 		return errors.New("requested instance nonexistent or missing rights")
 	}
+	err, _ = this.perm.RemoveResource(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, id)
+	if err != nil {
+		return err
+	}
 	_, err = this.instanceCollection().DeleteOne(ctx, bson.M{idKey: id})
 	return err
 }
