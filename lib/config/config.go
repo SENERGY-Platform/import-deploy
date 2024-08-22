@@ -49,7 +49,7 @@ type Config struct {
 	KafkaReplication                      int64  `json:"kafka_replication"`
 	Debug                                 bool   `json:"debug"`
 	StartupEnsureDeployed                 bool   `json:"startup_ensure_deployed"`
-	PermissionV2Url                       string `json:"permissions_v2_url"`
+	PermissionV2Url                       string `json:"permission_v2_url"`
 	MigrationUpdateAllInstancePermissions bool   `json:"migration_update_all_instance_permissions"`
 }
 
@@ -94,6 +94,9 @@ func handleEnvironmentVars(config *Config) {
 		fieldConfig := configType.Field(index).Tag.Get("config")
 		envName := fieldNameToEnvName(fieldName)
 		envValue := os.Getenv(envName)
+		if envValue == "" {
+			fmt.Printf("no value in environment variable %v -> keep default for %v\n", envName, fieldName)
+		}
 		if envValue != "" {
 			if !strings.Contains(fieldConfig, "secret") {
 				fmt.Println("use environment variable: ", envName, " = ", envValue)
