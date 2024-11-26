@@ -4,7 +4,6 @@ go 1.22
 
 require (
 	github.com/IBM/sarama v1.43.2
-	github.com/SENERGY-Platform/permission-search v0.0.19
 	github.com/SENERGY-Platform/service-commons v0.0.0-20240813072046-91b3195dd8fc
 	github.com/docker/docker v26.1.4+incompatible
 	github.com/google/uuid v1.6.0
@@ -15,8 +14,18 @@ require (
 )
 
 require (
+	github.com/Microsoft/hcsshim v0.12.4 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/containerd/containerd v1.7.18 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
+	github.com/lufia/plan9stats v0.0.0-20240513124658-fba389f38bae // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
+	github.com/shirou/gopsutil/v3 v3.24.5 // indirect
+	github.com/testcontainers/testcontainers-go v0.31.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.14 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240624140628-dc46fd24d27d // indirect
+	google.golang.org/grpc v1.64.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 )
 
 require (
@@ -80,7 +89,6 @@ require (
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gotest.tools/v3 v3.5.0 // indirect

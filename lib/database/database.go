@@ -30,8 +30,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-func New(conf config.Config, ctx context.Context, wg *sync.WaitGroup) (db Database, err error) {
-	perm := permV2Client.New(conf.PermissionV2Url)
+func New(conf config.Config, perm permV2Client.Client, ctx context.Context, wg *sync.WaitGroup) (db Database, err error) {
 	mong, err := mongo.New(perm, conf, ctx, wg)
 	if err != nil {
 		return db, err

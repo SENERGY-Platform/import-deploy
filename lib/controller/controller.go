@@ -18,7 +18,7 @@ package controller
 
 import (
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
-	"github.com/SENERGY-Platform/permission-search/lib/client"
+	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 )
 
 type Controller struct {
@@ -26,15 +26,15 @@ type Controller struct {
 	deploymentClient DeploymentClient
 	kafkaAdmin       KafkaAdmin
 	config           config.Config
-	permissionsearch client.Client
+	permv2           permV2Client.Client
 }
 
-func New(config config.Config, db Database, deploymentClient DeploymentClient, kafkaAdmin KafkaAdmin) *Controller {
+func New(config config.Config, db Database, deploymentClient DeploymentClient, kafkaAdmin KafkaAdmin, perm permV2Client.Client) *Controller {
 	return &Controller{
 		db:               db,
 		deploymentClient: deploymentClient,
 		kafkaAdmin:       kafkaAdmin,
 		config:           config,
-		permissionsearch: client.NewClient(config.PermissionsUrl),
+		permv2:           perm,
 	}
 }

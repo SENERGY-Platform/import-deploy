@@ -357,5 +357,6 @@ func (this *Controller) getEnv(instance model.Instance) (m map[string]string, er
 }
 
 func (this *Controller) hasXAccess(jwt jwt.Token, importTypeId string) (bool, error) {
-	return this.checkBool(jwt, "import-types", importTypeId, model.EXECUTE)
+	access, err, _ := this.permv2.CheckPermission(jwt.Token, "import-types", importTypeId, 'x')
+	return access, err
 }

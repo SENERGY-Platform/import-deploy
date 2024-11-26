@@ -28,13 +28,15 @@ import (
 	rancher_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/rancher-api"
 	rancher2_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/rancher2-api"
 	kafkaAdmin "github.com/SENERGY-Platform/import-deploy/lib/kafka-admin"
+	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 	"log"
 	"sync"
 )
 
 func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err error) {
 	wg = &sync.WaitGroup{}
-	data, err := database.New(conf, ctx, wg)
+	perm := permV2Client.New(conf.PermissionV2Url)
+	data, err := database.New(conf, perm, ctx, wg)
 	if err != nil {
 		return wg, err
 	}
@@ -63,7 +65,7 @@ func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err err
 		return wg, err
 	}
 
-	ctrl := controller.New(conf, data, deploymentClient, kafka)
+	ctrl := controller.New(conf, data, deploymentClient, kafka, perm)
 
 	if conf.StartupEnsureDeployed {
 		log.Println("Restoring missing import containers")
