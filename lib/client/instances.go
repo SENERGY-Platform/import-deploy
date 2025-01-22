@@ -43,7 +43,7 @@ func (c *Client) ListInstances(jwt jwt.Token, limit int64, offset int64, sort st
 	if err != nil {
 		return results, err, http.StatusBadRequest
 	}
-	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
+	req.Header.Set("Authorization", prefixTokenIfNeeded(jwt))
 	return do[[]model.Instance](req)
 }
 
@@ -52,7 +52,7 @@ func (c *Client) ReadInstance(id string, jwt jwt.Token, forUser string) (result 
 	if err != nil {
 		return result, err, http.StatusBadRequest
 	}
-	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
+	req.Header.Set("Authorization", prefixTokenIfNeeded(jwt))
 	return do[model.Instance](req)
 }
 
@@ -65,7 +65,7 @@ func (c *Client) CreateInstance(instance model.Instance, jwt jwt.Token) (result 
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}
-	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
+	req.Header.Set("Authorization", prefixTokenIfNeeded(jwt))
 	return do[model.Instance](req)
 }
 
@@ -78,7 +78,7 @@ func (c *Client) SetInstance(importType model.Instance, jwt jwt.Token) (err erro
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
-	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
+	req.Header.Set("Authorization", prefixTokenIfNeeded(jwt))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err, http.StatusInternalServerError
@@ -91,7 +91,7 @@ func (c *Client) DeleteInstance(id string, jwt jwt.Token, forUser string) (err e
 	if err != nil {
 		return err, http.StatusBadRequest
 	}
-	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
+	req.Header.Set("Authorization", prefixTokenIfNeeded(jwt))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err, http.StatusInternalServerError
@@ -107,6 +107,6 @@ func (c *Client) CountInstances(jwt jwt.Token, search string, includeGenerated b
 	if err != nil {
 		return 0, err, http.StatusBadRequest
 	}
-	req.Header.Set("Authorization", "Bearer "+jwt.Jwt())
+	req.Header.Set("Authorization", prefixTokenIfNeeded(jwt))
 	return do[int64](req)
 }

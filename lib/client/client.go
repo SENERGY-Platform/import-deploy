@@ -19,10 +19,12 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 	"io"
 	"net/http"
+	"strings"
+
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 )
 
 type Interface interface {
@@ -58,4 +60,12 @@ func do[T any](req *http.Request) (result T, err error, code int) {
 		return result, err, http.StatusInternalServerError
 	}
 	return
+}
+
+func prefixTokenIfNeeded(jwt jwt.Token) string {
+	s := jwt.Jwt()
+	if !strings.HasPrefix(strings.ToLower(s), "bearer ") {
+		s = "Bearer " + s
+	}
+	return s
 }
