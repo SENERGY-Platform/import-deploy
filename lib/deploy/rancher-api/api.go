@@ -103,7 +103,7 @@ func (r Rancher) RemoveContainer(id string) (err error) {
 	return
 }
 
-func (r Rancher) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, _ string, _ string) (newId string, err error) {
+func (r Rancher) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, _ string, _ string, _ bool) (newId string, err error) {
 	err = r.RemoveContainer(id)
 	if err != nil {
 		return newId, err
@@ -125,7 +125,7 @@ func (r Rancher) UpdateContainer(id string, name string, image string, env map[s
 	}
 }
 
-func (r Rancher) ContainerExists(id string) (exists bool, err error) {
+func (r Rancher) ContainerExists(id string, _ *bool) (exists bool, err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 	resp, _, errs := request.Get(r.url + "services/" + id).End()
 	if len(errs) > 0 {

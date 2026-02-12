@@ -18,12 +18,13 @@ package dockerClient
 
 import (
 	"context"
+	"sync"
+
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/util"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	docker "github.com/docker/docker/client"
-	"sync"
 )
 
 type DockerClient struct {
@@ -45,10 +46,10 @@ func New(config config.Config, ctx context.Context, wg *sync.WaitGroup) (client 
 	return &DockerClient{config: config, cli: cli}, nil
 }
 
-func (this *DockerClient) CreateContainer(name string, image string, env map[string]string, restart bool, _ string, _ string) (id string, err error) {
+func (this *DockerClient) CreateContainer(name string, refStr string, env map[string]string, restart bool, _ string, _ string) (id string, err error) {
 	ctx, _ := util.GetTimeoutContext()
 	if this.config.DockerPull == true {
-		_, err = this.cli.ImagePull(ctx, image, types.ImagePullOptions{})
+		_, err = this.cli.ImagePull(ctx, refStr, image.PullOptions{})
 		if err != nil {
 			return id, err
 		}
@@ -64,7 +65,7 @@ func (this *DockerClient) CreateContainer(name string, image string, env map[str
 		restartPolicy = container.RestartPolicy{Name: "no"}
 	}
 	resp, err := this.cli.ContainerCreate(ctx, &container.Config{
-		Image: image,
+		Image: refStr,
 		Env:   dockerEnv,
 	}, &container.HostConfig{
 		NetworkMode:   container.NetworkMode(this.config.DockerNetwork),
@@ -81,7 +82,7 @@ func (this *DockerClient) CreateContainer(name string, image string, env map[str
 	return resp.ID, err
 }
 
-func (this *DockerClient) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (newId string, err error) {
+func (this *DockerClient) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, _ bool) (newId string, err error) {
 	err = this.RemoveContainer(id)
 	if err != nil {
 		return newId, err
@@ -101,7 +102,7 @@ func (this *DockerClient) RemoveContainer(id string) (err error) {
 	return nil
 }
 
-func (this *DockerClient) ContainerExists(id string) (exists bool, err error) {
+func (this *DockerClient) ContainerExists(id string, _ *bool) (exists bool, err error) {
 	ctx, _ := util.GetTimeoutContext()
 	_, err = this.cli.ContainerInspect(ctx, id)
 	if err != nil {

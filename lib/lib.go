@@ -19,18 +19,20 @@ package lib
 import (
 	"context"
 	"errors"
+	"log"
+	"sync"
+
 	"github.com/SENERGY-Platform/import-deploy/lib/api"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/controller"
 	"github.com/SENERGY-Platform/import-deploy/lib/database"
 	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
 	"github.com/SENERGY-Platform/import-deploy/lib/deploy/dockerClient"
+	kubernetes_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/kubernetes-api"
 	rancher_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/rancher-api"
 	rancher2_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/rancher2-api"
 	kafkaAdmin "github.com/SENERGY-Platform/import-deploy/lib/kafka-admin"
 	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
-	"log"
-	"sync"
 )
 
 func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err error) {
@@ -46,13 +48,12 @@ func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err err
 	switch conf.DeployMode {
 	case "docker":
 		deploymentClient, err = dockerClient.New(conf, ctx, wg)
-		break
 	case "rancher1":
 		deploymentClient = rancher_api.New(conf)
-		break
 	case "rancher2":
 		deploymentClient = rancher2_api.New(conf)
-		break
+	case "kubernetes":
+		deploymentClient, err = kubernetes_api.New(conf)
 	default:
 		return wg, errors.New("unknown deploy_mode")
 	}

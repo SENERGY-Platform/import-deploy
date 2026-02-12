@@ -18,8 +18,8 @@ package deploy
 
 type DeploymentClient interface {
 	CreateContainer(name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (id string, err error)
-	UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (newId string, err error)
+	UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, existingRestart bool) (newId string, err error)
 	RemoveContainer(id string) (err error)
-	ContainerExists(id string) (exists bool, err error)
+	ContainerExists(id string, restart *bool) (exists bool, err error)
 	Disconnect() (err error)
 }

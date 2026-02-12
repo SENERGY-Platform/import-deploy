@@ -20,5 +20,8 @@
   "debug": true,
   "startup_ensure_deployed": false,
   "permission_v2_url": "http://permv2.permissions:8080",
-  "migration_update_all_instance_permissions": false
+  "migration_update_all_instance_permissions": false,
+  "kube_config": "",
+  "skip_migration": false,
+  "skip_kafka_admin": false
 }

@@ -95,9 +95,11 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt.Token) (
 	if err != nil {
 		return result, err, http.StatusBadRequest
 	}
-	err = this.kafkaAdmin.CreateTopic(instance.KafkaTopic)
-	if err != nil {
-		return result, err, http.StatusInternalServerError
+	if !this.config.SkipKafkaAdmin {
+		err = this.kafkaAdmin.CreateTopic(instance.KafkaTopic)
+		if err != nil {
+			return result, err, http.StatusInternalServerError
+		}
 	}
 	var restart bool
 	if instance.Restart == nil || *instance.Restart {
@@ -157,7 +159,14 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt.Token) (err
 		restart = false
 	}
 
-	instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId)
+	var existingRestart bool
+	if existing.Restart == nil || *existing.Restart {
+		existingRestart = true
+	} else {
+		existingRestart = false
+	}
+
+	instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId, existingRestart)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
@@ -184,9 +193,11 @@ func (this *Controller) DeleteInstance(id string, jwt jwt.Token) (err error, err
 		return err, http.StatusInternalServerError
 	}
 
-	err = this.kafkaAdmin.DeleteTopic(instance.KafkaTopic)
-	if err != nil {
-		return err, http.StatusInternalServerError
+	if !this.config.SkipKafkaAdmin {
+		err = this.kafkaAdmin.DeleteTopic(instance.KafkaTopic)
+		if err != nil {
+			return err, http.StatusInternalServerError
+		}
 	}
 
 	err = this.db.RemoveInstance(ctx, id, jwt)
@@ -210,7 +221,7 @@ func (this *Controller) EnsureAllInstancesDeployed() (err error) {
 		}
 		offset += int64(len(instances))
 		for _, instance := range instances {
-			exists, err := this.deploymentClient.ContainerExists(instance.ServiceId)
+			exists, err := this.deploymentClient.ContainerExists(instance.ServiceId, instance.Restart)
 			if err != nil {
 				return err
 			}

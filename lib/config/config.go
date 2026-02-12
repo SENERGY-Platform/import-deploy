@@ -50,6 +50,9 @@ type Config struct {
 	StartupEnsureDeployed                 bool   `json:"startup_ensure_deployed"`
 	PermissionV2Url                       string `json:"permission_v2_url"`
 	MigrationUpdateAllInstancePermissions bool   `json:"migration_update_all_instance_permissions"`
+	KubeConfig                            string `json:"kube_config"`
+	SkipMigration                         bool   `json:"skip_migration"`
+	SkipKafkaAdmin                        bool   `json:"skip_kafka_admin"`
 }
 
 // loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)

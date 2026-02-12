@@ -36,13 +36,6 @@ type Database interface {
 	CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (count int64, err error)
 }
 
-type DeploymentClient interface {
-	CreateContainer(name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (id string, err error)
-	UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (newId string, err error)
-	RemoveContainer(id string) (err error)
-	ContainerExists(id string) (exists bool, err error)
-}
-
 type KafkaAdmin interface {
 	CreateTopic(name string) (err error)
 	DeleteTopic(name string) (err error)

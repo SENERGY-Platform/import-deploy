@@ -42,7 +42,7 @@ func New(config config.Config) *Rancher2 {
 	return &Rancher2{config.RancherUrl, config.RancherAccessKey, config.RancherSecretKey, config.RancherNamespaceId, config.RancherProjectId, kubeUrl}
 }
 
-func (r *Rancher2) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (newId string, err error) {
+func (r *Rancher2) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, _ bool) (newId string, err error) {
 	err = r.RemoveContainer(id)
 	if err != nil {
 		return newId, err
@@ -200,7 +200,7 @@ func (r *Rancher2) RemoveContainer(id string) (err error) {
 	return
 }
 
-func (r *Rancher2) ContainerExists(id string) (exists bool, err error) {
+func (r *Rancher2) ContainerExists(id string, _ *bool) (exists bool, err error) {
 	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
 	resp, _, errs := request.Get(r.url + "projects/" + r.projectId + "/workloads/deployment:" +
 		r.namespaceId + ":" + id).End()

@@ -18,18 +18,19 @@ package controller
 
 import (
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
 	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 )
 
 type Controller struct {
 	db               Database
-	deploymentClient DeploymentClient
+	deploymentClient deploy.DeploymentClient
 	kafkaAdmin       KafkaAdmin
 	config           config.Config
 	permv2           permV2Client.Client
 }
 
-func New(config config.Config, db Database, deploymentClient DeploymentClient, kafkaAdmin KafkaAdmin, perm permV2Client.Client) *Controller {
+func New(config config.Config, db Database, deploymentClient deploy.DeploymentClient, kafkaAdmin KafkaAdmin, perm permV2Client.Client) *Controller {
 	return &Controller{
 		db:               db,
 		deploymentClient: deploymentClient,

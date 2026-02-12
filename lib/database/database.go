@@ -36,6 +36,10 @@ func New(conf config.Config, perm permV2Client.Client, ctx context.Context, wg *
 		return db, err
 	}
 	db = mong
+	if conf.SkipMigration {
+		log.Println("skipping migration")
+		return db, nil
+	}
 	err = migrate(conf, mong, perm, ctx)
 	if err != nil {
 		return db, err
