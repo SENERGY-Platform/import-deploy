@@ -20,10 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	model2 "github.com/SENERGY-Platform/permissions-v2/pkg/model"
-	"log"
 	"net/http"
 
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
+	model2 "github.com/SENERGY-Platform/permissions-v2/pkg/model"
+
+	"github.com/SENERGY-Platform/import-deploy/lib/log"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
@@ -53,31 +55,38 @@ func init() {
 	var err error
 	idKey, err = getBsonFieldName(model.Instance{}, idFieldName)
 	if err != nil {
-		log.Fatal(err)
+		log.Logger.Error("unable to resolve bson field name", "field", idFieldName, attributes.ErrorKey, err)
+		panic(err)
 	}
 	nameKey, err = getBsonFieldName(model.Instance{}, nameFieldName)
 	if err != nil {
-		log.Fatal(err)
+		log.Logger.Error("unable to resolve bson field name", "field", nameFieldName, attributes.ErrorKey, err)
+		panic(err)
 	}
 	ownerKey, err = getBsonFieldName(model.Instance{}, ownerFieldName)
 	if err != nil {
-		log.Fatal(err)
+		log.Logger.Error("unable to resolve bson field name", "field", ownerFieldName, attributes.ErrorKey, err)
+		panic(err)
 	}
 	createdAtKey, err = getBsonFieldName(model.Instance{}, createdAtFieldName)
 	if err != nil {
-		log.Fatal(err)
+		log.Logger.Error("unable to resolve bson field name", "field", createdAtFieldName, attributes.ErrorKey, err)
+		panic(err)
 	}
 	updatedAtKey, err = getBsonFieldName(model.Instance{}, updatedAtFieldName)
 	if err != nil {
-		log.Fatal(err)
+		log.Logger.Error("unable to resolve bson field name", "field", updatedAtFieldName, attributes.ErrorKey, err)
+		panic(err)
 	}
 	generatedKey, err = getBsonFieldName(model.Instance{}, generatedFieldName)
 	if err != nil {
-		log.Fatal(err)
+		log.Logger.Error("unable to resolve bson field name", "field", generatedFieldName, attributes.ErrorKey, err)
+		panic(err)
 	}
 	imageKey, err = getBsonFieldName(model.Instance{}, imageFieldName)
 	if err != nil {
-		log.Fatal(err)
+		log.Logger.Error("unable to resolve bson field name", "field", imageFieldName, attributes.ErrorKey, err)
+		panic(err)
 	}
 
 	CreateCollections = append(CreateCollections, func(db *Mongo) error {

@@ -19,9 +19,9 @@ package lib
 import (
 	"context"
 	"errors"
-	"log"
 	"sync"
 
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	"github.com/SENERGY-Platform/import-deploy/lib/api"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/controller"
@@ -32,6 +32,7 @@ import (
 	rancher_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/rancher-api"
 	rancher2_api "github.com/SENERGY-Platform/import-deploy/lib/deploy/rancher2-api"
 	kafkaAdmin "github.com/SENERGY-Platform/import-deploy/lib/kafka-admin"
+	"github.com/SENERGY-Platform/import-deploy/lib/log"
 	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 )
 
@@ -69,7 +70,7 @@ func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err err
 	ctrl := controller.New(conf, data, deploymentClient, kafka, perm)
 
 	if conf.StartupEnsureDeployed {
-		log.Println("Restoring missing import containers")
+		log.Logger.Info("Restoring missing import containers")
 		err = ctrl.EnsureAllInstancesDeployed()
 		if err != nil {
 			return wg, err
@@ -78,7 +79,7 @@ func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err err
 
 	err = api.Start(conf, ctrl)
 	if err != nil {
-		log.Println("ERROR: unable to start api", err)
+		log.Logger.Error("unable to start api", attributes.ErrorKey, err)
 		return wg, err
 	}
 

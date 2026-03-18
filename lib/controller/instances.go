@@ -19,12 +19,12 @@ package controller
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"math"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/SENERGY-Platform/import-deploy/lib/log"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"github.com/SENERGY-Platform/import-deploy/lib/util"
 	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
@@ -226,10 +226,10 @@ func (this *Controller) EnsureAllInstancesDeployed() (err error) {
 				return err
 			}
 			if exists {
-				log.Println(instance.Id + " still exists")
+				log.Logger.Debug("instance still exists", "instance_id", instance.Id)
 				continue
 			}
-			log.Println("Recreating " + instance.Id)
+			log.Logger.Info("recreating instance", "instance_id", instance.Id)
 			env, err := this.getEnv(instance)
 			if err != nil {
 				return err
@@ -328,23 +328,17 @@ func validateConfig(conf model.ImportTypeConfig, val interface{}) (valid bool) {
 		switch conf.Type {
 		case model.String:
 			_, valid = val.(string)
-			break
 		case model.Integer:
 			val, validInner := val.(float64)
 			valid = validInner && math.Mod(val, 1) == 0
-			break
 		case model.Float:
 			_, valid = val.(float64)
-			break
 		case model.List:
 			_, valid = val.([]interface{})
-			break
 		case model.Structure:
 			_, valid = val.(interface{})
-			break
 		case model.Boolean:
 			_, valid = val.(bool)
-			break
 		}
 	}
 	return valid

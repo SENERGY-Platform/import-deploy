@@ -53,6 +53,7 @@ type Config struct {
 	KubeConfig                            string `json:"kube_config"`
 	SkipMigration                         bool   `json:"skip_migration"`
 	SkipKafkaAdmin                        bool   `json:"skip_kafka_admin"`
+	LogHandler                            string `json:"log_handler"`
 }
 
 // loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)

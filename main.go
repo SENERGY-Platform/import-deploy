@@ -19,13 +19,16 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/SENERGY-Platform/import-deploy/lib"
-	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
+	"github.com/SENERGY-Platform/import-deploy/lib"
+	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	_log "github.com/SENERGY-Platform/import-deploy/lib/log"
 )
 
 func main() {
@@ -37,6 +40,7 @@ func main() {
 		log.Fatal("ERROR: unable to load config", err)
 	}
 
+	_log.Init(conf)
 	ctx, cancel := context.WithCancel(context.Background())
 	wg, err := lib.Start(conf, ctx)
 	if err != nil {
@@ -44,6 +48,7 @@ func main() {
 		if wg != nil {
 			wg.Wait()
 		}
+		_log.Logger.Error("unable to start service", attributes.ErrorKey, err)
 		log.Fatal(err)
 	}
 
@@ -52,11 +57,11 @@ func main() {
 		shutdown := make(chan os.Signal, 1)
 		signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 		sig := <-shutdown
-		log.Println("received shutdown signal", sig)
+		_log.Logger.Info("Shutdown signal received", "signal", sig)
 		shutdownTime = time.Now()
 		cancel()
 	}()
 
 	wg.Wait()
-	log.Println("Shutdown complete, took", time.Since(shutdownTime))
+	_log.Logger.Info("Shutdown complete, took", "duration", time.Since(shutdownTime))
 }

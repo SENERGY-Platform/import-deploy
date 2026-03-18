@@ -17,7 +17,6 @@
 package api
 
 import (
-	"log"
 	"net/http"
 	"reflect"
 	"runtime"
@@ -25,29 +24,36 @@ import (
 	"github.com/SENERGY-Platform/service-commons/pkg/accesslog"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	"github.com/SENERGY-Platform/import-deploy/lib/api/util"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/log"
 	"github.com/julienschmidt/httprouter"
 )
 
 var endpoints = []func(config config.Config, control Controller, router *httprouter.Router){}
 
 func Start(config config.Config, control Controller) (err error) {
-	log.Println("start api")
+	log.Logger.Info("start api")
 	router := httprouter.New()
-	log.Println("add heart beat endpoint")
+	log.Logger.Info("add heart beat endpoint")
 	router.GET("/", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
 		writer.WriteHeader(http.StatusOK)
 	})
 	for _, e := range endpoints {
-		log.Println("add endpoints: " + runtime.FuncForPC(reflect.ValueOf(e).Pointer()).Name())
+		log.Logger.Info("add endpoint", "endpoint", runtime.FuncForPC(reflect.ValueOf(e).Pointer()).Name())
 		e(config, control, router)
 	}
-	log.Println("add logging and cors")
+	log.Logger.Info("add logging and cors")
 	corsHandler := util.NewCors(router)
 	logger := accesslog.New(corsHandler)
-	log.Println("listen on port", config.ServerPort)
-	go func() { log.Println(http.ListenAndServe(":"+config.ServerPort, logger)) }()
+	log.Logger.Info("listen on port", "port", config.ServerPort)
+	go func() {
+		err := http.ListenAndServe(":"+config.ServerPort, logger)
+		if err != nil {
+			log.Logger.Error("unable to start api listener", attributes.ErrorKey, err)
+		}
+	}()
 	return nil
 }
 

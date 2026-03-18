@@ -23,5 +23,6 @@
   "migration_update_all_instance_permissions": false,
   "kube_config": "",
   "skip_migration": false,
-  "skip_kafka_admin": false
+  "skip_kafka_admin": false,
+  "log_handler": "json"
 }

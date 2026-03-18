@@ -18,13 +18,14 @@ package database
 
 import (
 	"context"
-	model2 "github.com/SENERGY-Platform/permissions-v2/pkg/model"
-	"log"
 	"slices"
 	"sync"
 
+	model2 "github.com/SENERGY-Platform/permissions-v2/pkg/model"
+
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/database/mongo"
+	"github.com/SENERGY-Platform/import-deploy/lib/log"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 	"golang.org/x/exp/maps"
@@ -37,7 +38,7 @@ func New(conf config.Config, perm permV2Client.Client, ctx context.Context, wg *
 	}
 	db = mong
 	if conf.SkipMigration {
-		log.Println("skipping migration")
+		log.Logger.Info("skipping migration")
 		return db, nil
 	}
 	err = migrate(conf, mong, perm, ctx)
@@ -48,7 +49,7 @@ func New(conf config.Config, perm permV2Client.Client, ctx context.Context, wg *
 }
 
 func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ctx context.Context) error {
-	log.Println("ensure permissions-v2 topic")
+	log.Logger.Info("ensure permissions-v2 topic")
 	_, err, _ := perm.SetTopic(permV2Client.InternalAdminToken, permV2Client.Topic{
 		Id: model.PermV2InstanceTopic,
 		DefaultPermissions: permV2Client.ResourcePermissions{
@@ -70,7 +71,7 @@ func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ct
 		return nil
 	}
 
-	log.Println("migrating instance permissions")
+	log.Logger.Info("migrating instance permissions")
 
 	instances, err := db.AdminListInstances(ctx, -1, 0, "", true, "", true)
 	if err != nil {
@@ -108,7 +109,7 @@ func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ct
 		if err != nil {
 			return err
 		}
-		log.Println(instance.Id, "migrated")
+		log.Logger.Info("instance migrated", "instance_id", instance.Id)
 	}
 
 	permResouceIds := maps.Keys(permResouceMap)
@@ -119,10 +120,10 @@ func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ct
 			if err != nil {
 				return err
 			}
-			log.Println(permResouceId, "exists only in permissions-v2, now deleted")
+			log.Logger.Info("deleted orphaned permissions-v2 resource", "resource_id", permResouceId)
 		}
 	}
 
-	log.Println("migration finished")
+	log.Logger.Info("migration finished")
 	return nil
 }
