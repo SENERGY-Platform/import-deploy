@@ -17,177 +17,155 @@
 package api
 
 import (
-	"encoding/json"
-	"net/http"
+	"errors"
 	"strconv"
 	"strings"
 
-	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
-	"github.com/SENERGY-Platform/import-deploy/lib/log"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	"github.com/julienschmidt/httprouter"
+	"github.com/gin-gonic/gin"
 )
 
 func init() {
 	endpoints = append(endpoints, InstancesEndpoints)
 }
 
-func InstancesEndpoints(_ config.Config, control Controller, router *httprouter.Router) {
+func InstancesEndpoints(_ config.Config, control Controller, router *gin.Engine) {
 	resource := "/instances"
 
-	router.GET(resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		token, err := getToken(request)
+	router.GET(resource, func(c *gin.Context) {
+		token, err := getToken(c.Request)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
-		limit := request.URL.Query().Get("limit")
+		limit := c.Query("limit")
 		if limit == "" {
 			limit = "100"
 		}
 		limitInt, err := strconv.ParseInt(limit, 10, 64)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
-		offset := request.URL.Query().Get("offset")
+		offset := c.Query("offset")
 		if offset == "" {
 			offset = "0"
 		}
 		offsetInt, err := strconv.ParseInt(offset, 10, 64)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
-		sort := request.URL.Query().Get("sort")
+		sort := c.Query("sort")
 		if sort == "" {
 			sort = "name"
 		}
 		orderBy := strings.Split(sort, ".")[0]
 		asc := !strings.HasSuffix(sort, ".desc")
 
-		search := request.URL.Query().Get("search")
+		search := c.Query("search")
 
-		includeGenerated := strings.ToLower(request.URL.Query().Get("exclude_generated")) != "true"
+		includeGenerated := strings.ToLower(c.Query("exclude_generated")) != "true"
 		results, err, errCode := control.ListInstances(token, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
 		if err != nil {
-			http.Error(writer, err.Error(), errCode)
+			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
 		}
-		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-		err = json.NewEncoder(writer).Encode(results)
-		if err != nil {
-			log.Logger.Error("unable to encode response", attributes.ErrorKey, err)
-		}
-		return
+		c.JSON(200, results)
 	})
 
-	router.GET("/total"+resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		token, err := getToken(request)
+	router.GET("/total"+resource, func(c *gin.Context) {
+		token, err := getToken(c.Request)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
 
-		search := request.URL.Query().Get("search")
-		includeGenerated := strings.ToLower(request.URL.Query().Get("exclude_generated")) != "true"
+		search := c.Query("search")
+		includeGenerated := strings.ToLower(c.Query("exclude_generated")) != "true"
 
 		count, err, errCode := control.CountInstances(token, search, includeGenerated)
 		if err != nil {
-			http.Error(writer, err.Error(), errCode)
+			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
 		}
-		writer.Header().Set("Content-Type", "application/txt; charset=utf-8")
-		writer.Write([]byte(strconv.FormatInt(int64(count), 10)))
+		c.String(200, strconv.FormatInt(int64(count), 10))
 	})
 
-	router.GET(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		token, err := getToken(request)
+	router.GET(resource+"/:id", func(c *gin.Context) {
+		token, err := getToken(c.Request)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
-		id := params.ByName("id")
+		id := c.Param("id")
 		result, err, errCode := control.ReadInstance(id, token)
 		if err != nil {
-			http.Error(writer, err.Error(), errCode)
+			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
 		}
-		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-		err = json.NewEncoder(writer).Encode(result)
-		if err != nil {
-			log.Logger.Error("unable to encode response", attributes.ErrorKey, err)
-		}
-		return
+		c.JSON(200, result)
 	})
 
-	router.DELETE(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		token, err := getToken(request)
+	router.DELETE(resource+"/:id", func(c *gin.Context) {
+		token, err := getToken(c.Request)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
-		id := params.ByName("id")
+		id := c.Param("id")
 		err, errCode := control.DeleteInstance(id, token)
 		if err != nil {
-			http.Error(writer, err.Error(), errCode)
+			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
 		}
-		writer.WriteHeader(errCode)
-		return
+		c.Status(errCode)
 	})
 
-	router.PUT(resource+"/:id", func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		token, err := getToken(request)
+	router.PUT(resource+"/:id", func(c *gin.Context) {
+		token, err := getToken(c.Request)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
-		id := params.ByName("id")
+		id := c.Param("id")
 		instance := model.Instance{}
-		err = json.NewDecoder(request.Body).Decode(&instance)
+		err = c.ShouldBind(&instance)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
 
 		if id != instance.Id {
-			http.Error(writer, "IDs don't match", http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, errors.New("IDs don't match")))
 			return
 		}
 		err, code := control.SetInstance(instance, token)
 		if err != nil {
-			http.Error(writer, err.Error(), code)
+			_ = c.Error(errors.Join(model.GetError(code), err))
 			return
 		}
-		writer.WriteHeader(http.StatusOK)
+		c.Status(200)
 	})
 
-	router.POST(resource, func(writer http.ResponseWriter, request *http.Request, params httprouter.Params) {
-		token, err := getToken(request)
+	router.POST(resource, func(c *gin.Context) {
+		token, err := getToken(c.Request)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
 		instance := model.Instance{}
-		err = json.NewDecoder(request.Body).Decode(&instance)
+		err = c.ShouldBind(&instance)
 		if err != nil {
-			http.Error(writer, err.Error(), http.StatusBadRequest)
+			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
 		result, err, code := control.CreateInstance(instance, token)
 		if err != nil {
-			http.Error(writer, err.Error(), code)
+			_ = c.Error(errors.Join(model.GetError(code), err))
 			return
 		}
-		writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-		writer.WriteHeader(code)
-		err = json.NewEncoder(writer).Encode(result)
-		if err != nil {
-			log.Logger.Error("unable to encode response", attributes.ErrorKey, err)
-			return
-		}
-		return
+		c.JSON(code, result)
 	})
 }
