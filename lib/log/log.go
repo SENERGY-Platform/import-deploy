@@ -43,7 +43,7 @@ func Init(config config.Config) {
 
 	handler := slogger.GetHandler(config.LogHandler, os.Stdout, options, slog.Default().Handler())
 	handler = handler.WithAttrs([]slog.Attr{
-		slog.String(attributes.ProjectKey, "github.com/SENERGY-Platform/kafka2mqtt-manager"),
+		slog.String(attributes.ProjectKey, "github.com/SENERGY-Platform/import-deploy"),
 		slog.String(attributes.OrganizationKey, "github.com/SENERGY-Platform"),
 	})
 
