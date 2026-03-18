@@ -1,0 +1,296 @@
+basePath: /
+definitions:
+  model.Instance:
+    properties:
+      configs:
+        items:
+          $ref: '#/definitions/model.InstanceConfig'
+        type: array
+      created_at:
+        type: string
+      generated:
+        type: boolean
+      id:
+        type: string
+      image:
+        type: string
+      import_type_id:
+        type: string
+      kafka_topic:
+        type: string
+      name:
+        type: string
+      restart:
+        type: boolean
+      updated_at:
+        type: string
+    type: object
+  model.InstanceConfig:
+    properties:
+      name:
+        type: string
+      value: {}
+    type: object
+info:
+  contact: {}
+  description: Launches and stops import instances and provides information about
+    them.
+  title: Import Deploy API
+paths:
+  /:
+    get:
+      description: Returns HTTP 200 when the service is running.
+      responses:
+        "200":
+          description: OK
+      summary: Health check
+      tags:
+      - service
+  /doc:
+    get:
+      description: Returns the generated Swagger document for this service.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get OpenAPI document
+      tags:
+      - documentation
+  /instances:
+    get:
+      description: Returns import instances visible to the caller.
+      parameters:
+      - default: 100
+        description: Maximum number of results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Result offset
+        in: query
+        name: offset
+        type: integer
+      - default: name
+        description: Sort order
+        in: query
+        name: sort
+        type: string
+      - description: Free-text search term
+        in: query
+        name: search
+        type: string
+      - description: If true, excludes generated instances
+        in: query
+        name: exclude_generated
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Instance'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: List instances
+      tags:
+      - instances
+    post:
+      consumes:
+      - application/json
+      description: Creates a new instance.
+      parameters:
+      - description: Instance payload
+        in: body
+        name: instance
+        required: true
+        schema:
+          $ref: '#/definitions/model.Instance'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Instance'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Create instance
+      tags:
+      - instances
+  /instances/{id}:
+    delete:
+      description: Deletes a single instance by id.
+      parameters:
+      - description: Instance id
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Delete instance
+      tags:
+      - instances
+    get:
+      description: Returns a single instance by id.
+      parameters:
+      - description: Instance id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Instance'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Get instance
+      tags:
+      - instances
+    put:
+      consumes:
+      - application/json
+      description: Replaces an instance. The request body id must match the path id.
+      parameters:
+      - description: Instance id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Full instance payload
+        in: body
+        name: instance
+        required: true
+        schema:
+          $ref: '#/definitions/model.Instance'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Update instance
+      tags:
+      - instances
+  /total/instances:
+    get:
+      description: Returns the total number of instances visible to the caller.
+      parameters:
+      - description: Free-text search term
+        in: query
+        name: search
+        type: string
+      - description: If true, excludes generated instances
+        in: query
+        name: exclude_generated
+        type: boolean
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "403":
+          description: Forbidden
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Count instances
+      tags:
+      - instances
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -34,6 +34,13 @@ import (
 
 var endpoints = []func(config config.Config, control Controller, router *gin.Engine){}
 
+// Start godoc
+// @title Import Deploy API
+// @description Launches and stops import instances and provides information about them.
+// @BasePath /
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
 func Start(config config.Config, control Controller) (err error) {
 	log.Logger.Info("start api")
 	gin.SetMode(gin.ReleaseMode)
@@ -53,9 +60,7 @@ func Start(config config.Config, control Controller) (err error) {
 		log.Logger.Info("add endpoint", "name", runtime.FuncForPC(reflect.ValueOf(e).Pointer()).Name())
 		e(config, control, router)
 	}
-	router.GET("/", func(ctx *gin.Context) {
-		ctx.Status(http.StatusOK)
-	})
+	router.GET("/", healthHandler)
 	log.Logger.Info("listen on port", "port", config.ServerPort)
 	go func() {
 		err := http.ListenAndServe(":"+config.ServerPort, router)
@@ -72,4 +77,14 @@ func getToken(request *http.Request) (token jwt.Token, err error) {
 		return token, err
 	}
 	return token, nil
+}
+
+// healthHandler godoc
+// @Summary Health check
+// @Description Returns HTTP 200 when the service is running.
+// @Tags service
+// @Success 200
+// @Router / [get]
+func healthHandler(ctx *gin.Context) {
+	ctx.Status(http.StatusOK)
 }
