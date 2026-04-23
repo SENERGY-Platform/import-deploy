@@ -72,7 +72,7 @@ func (this *k8s) CreateContainer(name string, image string, env map[string]strin
 	var targetRef *autoscalingv1.CrossVersionObjectReference
 	if restart {
 		// create deployment
-		deployment := getDeployment(name, labels, container)
+		deployment := getDeployment(name, labels, container, this.config.ImagePullSecrets)
 		_, err = this.clientset.AppsV1().Deployments(this.config.RancherNamespaceId).Create(ctx, deployment, metav1.CreateOptions{})
 		if err != nil {
 			return "", fmt.Errorf("failed to create deployment: %v", err)
@@ -144,7 +144,7 @@ func (this *k8s) UpdateContainer(id string, name string, image string, env map[s
 			"importId":     name,
 			"importTypeId": strings.ReplaceAll(importTypeId, ":", "_"),
 		}
-		deployment := getDeployment(name, labels, container)
+		deployment := getDeployment(name, labels, container, this.config.ImagePullSecrets)
 		_, err = this.clientset.AppsV1().Deployments(this.config.RancherNamespaceId).Update(ctx, deployment, metav1.UpdateOptions{})
 		if err != nil {
 			return "", fmt.Errorf("failed to update deployment: %v", err)
@@ -278,7 +278,11 @@ func getContainer(name string, image string, env map[string]string) corev1.Conta
 	}
 }
 
-func getDeployment(name string, labels map[string]string, container corev1.Container) *appsv1.Deployment {
+func getDeployment(name string, labels map[string]string, container corev1.Container, imagePullSecrets []string) *appsv1.Deployment {
+	pullsecrets := []corev1.LocalObjectReference{}
+	for _, secret := range imagePullSecrets {
+		pullsecrets = append(pullsecrets, corev1.LocalObjectReference{Name: secret})
+	}
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -292,7 +296,8 @@ func getDeployment(name string, labels map[string]string, container corev1.Conta
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{container},
+					Containers:       []corev1.Container{container},
+					ImagePullSecrets: pullsecrets,
 				},
 			},
 		},

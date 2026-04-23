@@ -24,5 +24,6 @@
   "kube_config": "",
   "skip_migration": false,
   "skip_kafka_admin": false,
-  "log_handler": "json"
+  "log_handler": "json",
+  "image_pull_secrets": []
 }
