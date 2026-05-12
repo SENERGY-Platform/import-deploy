@@ -28,6 +28,7 @@ import (
 	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/log"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/requestid"
 	"github.com/gin-gonic/gin"
 )
@@ -45,7 +46,13 @@ func Start(config config.Config, control Controller) (err error) {
 	log.Logger.Info("start api")
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
+
 	router.Use(
+		cors.New(cors.Config{
+			AllowAllOrigins: true,
+			AllowMethods:    []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowHeaders:    []string{"Authorization", "Content-Type"},
+		}),
 		gin_mw.StructLoggerHandlerWithDefaultGenerators(
 			log.Logger.With(attributes.LogRecordTypeKey, attributes.HttpAccessLogRecordTypeVal),
 			attributes.Provider,

@@ -91,7 +91,10 @@ func listInstancesHandler(control Controller) gin.HandlerFunc {
 
 		search := c.Query("search")
 
-		ids := strings.Split(c.Query("ids"), ",")
+		var ids []string
+		if c.Query("ids") != "" {
+			ids = strings.Split(c.Query("ids"), ",")
+		}
 
 		includeGenerated := strings.ToLower(c.Query("exclude_generated")) != "true"
 		results, err, errCode := control.ListInstances(token, limitInt, offsetInt, orderBy, asc, search, includeGenerated, ids)
