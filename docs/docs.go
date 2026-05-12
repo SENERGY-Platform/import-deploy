@@ -98,6 +98,16 @@ const docTemplate = `{
                         "description": "If true, excludes generated instances",
                         "name": "exclude_generated",
                         "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Get only specific instances by id (comma-separated list)",
+                        "name": "ids",
+                        "in": "query"
                     }
                 ],
                 "responses": {

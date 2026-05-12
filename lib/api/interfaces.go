@@ -22,7 +22,7 @@ import (
 )
 
 type Controller interface {
-	ListInstances(jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int)
+	ListInstances(jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string) (results []model.Instance, err error, errCode int)
 	ReadInstance(id string, jwt jwt.Token) (result model.Instance, err error, errCode int)
 	CreateInstance(instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int)
 	SetInstance(importType model.Instance, jwt jwt.Token) (err error, code int)

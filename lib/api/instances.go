@@ -51,6 +51,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *gin.Engine)
 // @Param sort query string false "Sort order" default(name)
 // @Param search query string false "Free-text search term"
 // @Param exclude_generated query bool false "If true, excludes generated instances"
+// @Param ids query []string false "Get only specific instances by id (comma-separated list)"
 // @Success 200 {array} model.Instance
 // @Failure 400 {string} ErrorResponse
 // @Failure 403 {string} ErrorResponse
@@ -90,8 +91,13 @@ func listInstancesHandler(control Controller) gin.HandlerFunc {
 
 		search := c.Query("search")
 
+		ids := c.QueryArray("ids")
+		if len(ids) == 0 {
+			ids = strings.Split(c.Query("ids"), ",")
+		}
+
 		includeGenerated := strings.ToLower(c.Query("exclude_generated")) != "true"
-		results, err, errCode := control.ListInstances(token, limitInt, offsetInt, orderBy, asc, search, includeGenerated)
+		results, err, errCode := control.ListInstances(token, limitInt, offsetInt, orderBy, asc, search, includeGenerated, ids)
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return

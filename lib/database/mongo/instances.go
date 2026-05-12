@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 
 	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	model2 "github.com/SENERGY-Platform/permissions-v2/pkg/model"
@@ -141,11 +142,21 @@ func (this *Mongo) AdminListInstances(ctx context.Context, limit int64, offset i
 	return this.listInstances(ctx, limit, offset, sort, asc, search, includeGenerated, []string{}, true)
 }
 
-func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool) (result []model.Instance, err error) {
+func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool, requestedIds []string) (result []model.Instance, err error) {
 	ids, err, _ := this.perm.ListAccessibleResourceIds(jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
 	if err != nil {
 		return nil, err
 	}
+	if len(requestedIds) > 0 {
+		mergedIds := []string{}
+		for _, id := range requestedIds {
+			if slices.Contains(ids, id) {
+				mergedIds = append(mergedIds, id)
+			}
+		}
+		ids = mergedIds
+	}
+
 	return this.listInstances(ctx, limit, offset, sort, asc, search, includeGenerated, ids, false)
 }
 

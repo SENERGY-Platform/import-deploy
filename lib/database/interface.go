@@ -26,7 +26,7 @@ import (
 type Database interface {
 	Disconnect()
 
-	ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool) (result []model.Instance, err error)
+	ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool, ids []string) (result []model.Instance, err error)
 	GetInstance(ctx context.Context, id string, jwt jwt.Token) (instance model.Instance, exists bool, err error)
 	CreateInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error
 	SetInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error

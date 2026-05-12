@@ -90,6 +90,13 @@ paths:
         in: query
         name: exclude_generated
         type: boolean
+      - collectionFormat: csv
+        description: Get only specific instances by id (comma-separated list)
+        in: query
+        items:
+          type: string
+        name: ids
+        type: array
       produces:
       - application/json
       responses:

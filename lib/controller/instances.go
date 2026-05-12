@@ -35,9 +35,9 @@ import (
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-func (this *Controller) ListInstances(jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (results []model.Instance, err error, errCode int) {
+func (this *Controller) ListInstances(jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string) (results []model.Instance, err error, errCode int) {
 	ctx, _ := util.GetTimeoutContext()
-	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt, asc, search, includeGenerated)
+	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt, asc, search, includeGenerated, ids)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}
@@ -212,7 +212,7 @@ func (this *Controller) EnsureAllInstancesDeployed() (err error) {
 	var batchSize int64 = 100
 	for {
 		ctx, _ := util.GetTimeoutContext()
-		instances, err := this.db.ListInstances(ctx, batchSize, offset, "name", jwt.Token{Token: permV2Client.InternalAdminToken}, true, "", true)
+		instances, err := this.db.ListInstances(ctx, batchSize, offset, "name", jwt.Token{Token: permV2Client.InternalAdminToken}, true, "", true, []string{})
 		if err != nil {
 			return err
 		}
