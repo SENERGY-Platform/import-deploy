@@ -8,6 +8,7 @@ import (
 
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"github.com/SENERGY-Platform/import-deploy/lib/util"
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -248,8 +249,113 @@ func (this *k8s) ContainerExists(id string, restart *bool) (exists bool, err err
 	return found, nil
 }
 
+func (this *k8s) GetContainerStatus(id string, restart *bool) (status model.InstanceStatus, err error) {
+	ctx, cf := util.GetTimeoutContext()
+	defer cf()
+	if restart == nil || *restart { // default => restart enabled => deployment
+		deployment, err := this.clientset.AppsV1().Deployments(this.config.RancherNamespaceId).Get(ctx, id, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return notFoundStatus(), nil
+			}
+			return status, fmt.Errorf("failed to get deployment: %v", err)
+		}
+		return deploymentStatus(deployment), nil
+	}
+	job, err := this.clientset.BatchV1().Jobs(this.config.RancherNamespaceId).Get(ctx, id, metav1.GetOptions{})
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return notFoundStatus(), nil
+		}
+		return status, fmt.Errorf("failed to get job: %v", err)
+	}
+	return jobStatus(job), nil
+}
+
+func (this *k8s) GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error) {
+	ctx, cf := util.GetTimeoutContext()
+	defer cf()
+	statuses = map[string]model.InstanceStatus{}
+	var supErr error
+	mux := sync.Mutex{}
+	wg := sync.WaitGroup{}
+
+	wg.Go(func() {
+		deployments, err := this.clientset.AppsV1().Deployments(this.config.RancherNamespaceId).List(ctx, metav1.ListOptions{})
+		mux.Lock()
+		defer mux.Unlock()
+		if err != nil {
+			supErr = errors.Join(supErr, fmt.Errorf("failed to list deployments: %v", err))
+			return
+		}
+		for _, deployment := range deployments.Items {
+			statuses[deployment.Name] = deploymentStatus(&deployment)
+		}
+	})
+
+	wg.Go(func() {
+		jobs, err := this.clientset.BatchV1().Jobs(this.config.RancherNamespaceId).List(ctx, metav1.ListOptions{})
+		mux.Lock()
+		defer mux.Unlock()
+		if err != nil {
+			supErr = errors.Join(supErr, fmt.Errorf("failed to list jobs: %v", err))
+			return
+		}
+		for _, job := range jobs.Items {
+			statuses[job.Name] = jobStatus(&job)
+		}
+	})
+
+	wg.Wait()
+	if supErr != nil {
+		return nil, supErr
+	}
+	return statuses, nil
+}
+
 func (this *k8s) Disconnect() (err error) {
 	return nil
+}
+
+func notFoundStatus() model.InstanceStatus {
+	return model.InstanceStatus{Running: false, Transitioning: false, Message: "not deployed"}
+}
+
+func deploymentStatus(deployment *appsv1.Deployment) model.InstanceStatus {
+	status := model.InstanceStatus{
+		Running:       deployment.Status.AvailableReplicas > 0 && deployment.Status.UnavailableReplicas == 0,
+		Transitioning: deployment.Status.UnavailableReplicas > 0,
+	}
+	// surface the reason of the most recent condition that is not satisfied
+	for _, condition := range deployment.Status.Conditions {
+		if condition.Status != corev1.ConditionTrue && condition.Message != "" {
+			status.Message = condition.Message
+			break
+		}
+	}
+	return status
+}
+
+func jobStatus(job *batchv1.Job) model.InstanceStatus {
+	status := model.InstanceStatus{
+		Running: job.Status.Active > 0,
+	}
+	switch {
+	case job.Status.Failed > 0:
+		status.Message = "failed"
+	case job.Status.Succeeded > 0:
+		status.Message = "completed"
+	case job.Status.Active == 0:
+		status.Transitioning = true
+		status.Message = "pending"
+	}
+	for _, condition := range job.Status.Conditions {
+		if condition.Status == corev1.ConditionTrue && condition.Message != "" {
+			status.Message = condition.Message
+			break
+		}
+	}
+	return status
 }
 
 func getContainer(name string, image string, env map[string]string) corev1.Container {

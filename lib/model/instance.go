@@ -34,6 +34,15 @@ type Instance struct {
 	CreatedAt    time.Time        `json:"created_at"`
 	UpdatedAt    time.Time        `json:"updated_at"`
 	Generated    bool             `json:"generated"`
+	// Status is filled from the deployment backend on read and is never persisted.
+	Status *InstanceStatus `json:"status,omitempty" bson:"-"`
+}
+
+// InstanceStatus describes the current state of the container running an instance.
+type InstanceStatus struct {
+	Running       bool   `json:"running"`
+	Transitioning bool   `json:"transitioning"`
+	Message       string `json:"message,omitempty"`
 }
 
 type InstanceConfig struct {

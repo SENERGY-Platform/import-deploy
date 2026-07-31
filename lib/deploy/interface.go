@@ -16,10 +16,23 @@
 
 package deploy
 
+import (
+	"errors"
+
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
+)
+
+// ErrNotSupported is returned by deployment clients that cannot provide the requested information.
+var ErrNotSupported = errors.New("operation not supported by deployment client")
+
 type DeploymentClient interface {
 	CreateContainer(name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (id string, err error)
 	UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, existingRestart bool) (newId string, err error)
 	RemoveContainer(id string) (err error)
 	ContainerExists(id string, restart *bool) (exists bool, err error)
+	// GetContainerStatus returns the current status of a single container.
+	GetContainerStatus(id string, restart *bool) (status model.InstanceStatus, err error)
+	// GetContainerStatuses returns the status of all known containers, keyed by container id.
+	GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error)
 	Disconnect() (err error)
 }

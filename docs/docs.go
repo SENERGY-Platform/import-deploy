@@ -57,7 +57,7 @@ const docTemplate = `{
         },
         "/instances": {
             "get": {
-                "description": "Returns import instances visible to the caller.",
+                "description": "Returns import instances visible to the caller, including the current container status.",
                 "produces": [
                     "application/json"
                 ],
@@ -199,7 +199,7 @@ const docTemplate = `{
         },
         "/instances/{id}": {
             "get": {
-                "description": "Returns a single instance by id.",
+                "description": "Returns a single instance by id, including the current container status.",
                 "produces": [
                     "application/json"
                 ],
@@ -439,6 +439,14 @@ const docTemplate = `{
                 "restart": {
                     "type": "boolean"
                 },
+                "status": {
+                    "description": "Status is filled from the deployment backend on read and is never persisted.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.InstanceStatus"
+                        }
+                    ]
+                },
                 "updated_at": {
                     "type": "string"
                 }
@@ -451,6 +459,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "value": {}
+            }
+        },
+        "model.InstanceStatus": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "running": {
+                    "type": "boolean"
+                },
+                "transitioning": {
+                    "type": "boolean"
+                }
             }
         }
     },

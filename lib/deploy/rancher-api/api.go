@@ -21,6 +21,8 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"github.com/hashicorp/go-uuid"
 	"github.com/parnurzeal/gorequest"
 	"net/http"
@@ -135,6 +137,14 @@ func (r Rancher) ContainerExists(id string, _ *bool) (exists bool, err error) {
 		return false, errors.New("unexpected status " + strconv.Itoa(resp.StatusCode))
 	}
 	return resp.StatusCode == http.StatusOK, nil
+}
+
+func (r Rancher) GetContainerStatus(_ string, _ *bool) (status model.InstanceStatus, err error) {
+	return status, deploy.ErrNotSupported
+}
+
+func (r Rancher) GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error) {
+	return nil, deploy.ErrNotSupported
 }
 
 func (r Rancher) Disconnect() (err error) {

@@ -24,6 +24,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
+	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
 	"github.com/SENERGY-Platform/import-deploy/lib/log"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"github.com/SENERGY-Platform/import-deploy/lib/util"
@@ -41,7 +43,31 @@ func (this *Controller) ListInstances(jwt jwt.Token, limit int64, offset int64, 
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}
+	this.addStatuses(results)
 	return results, nil, http.StatusOK
+}
+
+// addStatuses enriches the given instances with the current container status.
+// A failure to reach the deployment backend is logged, but does not fail the request:
+// the instances are returned without status information instead.
+func (this *Controller) addStatuses(instances []model.Instance) {
+	if len(instances) == 0 {
+		return
+	}
+	statuses, err := this.deploymentClient.GetContainerStatuses()
+	if err != nil {
+		if !errors.Is(err, deploy.ErrNotSupported) {
+			log.Logger.Warn("unable to get container statuses", attributes.ErrorKey, err)
+		}
+		return
+	}
+	for i, instance := range instances {
+		if status, ok := statuses[instance.ServiceId]; ok {
+			instances[i].Status = &status
+		} else {
+			instances[i].Status = &model.InstanceStatus{Message: "not deployed"}
+		}
+	}
 }
 
 func (this *Controller) CountInstances(jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int) {
@@ -61,6 +87,14 @@ func (this *Controller) ReadInstance(id string, jwt jwt.Token) (result model.Ins
 	}
 	if err != nil {
 		return result, err, http.StatusInternalServerError
+	}
+	status, err := this.deploymentClient.GetContainerStatus(result.ServiceId, result.Restart)
+	if err != nil {
+		if !errors.Is(err, deploy.ErrNotSupported) {
+			log.Logger.Warn("unable to get container status", "instance_id", result.Id, attributes.ErrorKey, err)
+		}
+	} else {
+		result.Status = &status
 	}
 	return result, nil, http.StatusOK
 }

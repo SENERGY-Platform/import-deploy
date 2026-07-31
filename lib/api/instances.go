@@ -43,7 +43,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *gin.Engine)
 
 // listInstancesHandler godoc
 // @Summary List instances
-// @Description Returns import instances visible to the caller.
+// @Description Returns import instances visible to the caller, including the current container status.
 // @Tags instances
 // @Produce json
 // @Param limit query int false "Maximum number of results" default(100)
@@ -140,7 +140,7 @@ func countInstancesHandler(control Controller) gin.HandlerFunc {
 
 // readInstanceHandler godoc
 // @Summary Get instance
-// @Description Returns a single instance by id.
+// @Description Returns a single instance by id, including the current container status.
 // @Tags instances
 // @Produce json
 // @Param id path string true "Instance id"

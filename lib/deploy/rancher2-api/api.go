@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"net/http"
 	"strconv"
 	"strings"
@@ -222,6 +224,14 @@ func (r *Rancher2) ContainerExists(id string, _ *bool) (exists bool, err error) 
 		return resp.StatusCode == http.StatusOK, nil
 	}
 	return true, nil
+}
+
+func (r *Rancher2) GetContainerStatus(_ string, _ *bool) (status model.InstanceStatus, err error) {
+	return status, deploy.ErrNotSupported
+}
+
+func (r *Rancher2) GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error) {
+	return nil, deploy.ErrNotSupported
 }
 
 func (r *Rancher2) Disconnect() (err error) {

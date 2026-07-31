@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"github.com/SENERGY-Platform/import-deploy/lib/util"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
@@ -114,6 +115,39 @@ func (this *DockerClient) ContainerExists(id string, _ *bool) (exists bool, err 
 	return true, nil
 }
 
+func (this *DockerClient) GetContainerStatus(id string, _ *bool) (status model.InstanceStatus, err error) {
+	ctx, _ := util.GetTimeoutContext()
+	inspect, err := this.cli.ContainerInspect(ctx, id)
+	if err != nil {
+		if docker.IsErrNotFound(err) {
+			return model.InstanceStatus{Message: "not deployed"}, nil
+		}
+		return status, err
+	}
+	return containerStatus(inspect.State.Status), nil
+}
+
+func (this *DockerClient) GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error) {
+	ctx, _ := util.GetTimeoutContext()
+	list, err := this.cli.ContainerList(ctx, container.ListOptions{All: true})
+	if err != nil {
+		return nil, err
+	}
+	statuses = map[string]model.InstanceStatus{}
+	for _, c := range list {
+		statuses[c.ID] = containerStatus(c.State)
+	}
+	return statuses, nil
+}
+
 func (this *DockerClient) Disconnect() (err error) {
 	return this.cli.Close()
+}
+
+func containerStatus(state string) model.InstanceStatus {
+	return model.InstanceStatus{
+		Running:       state == "running",
+		Transitioning: state == "created" || state == "restarting" || state == "removing",
+		Message:       state,
+	}
 }

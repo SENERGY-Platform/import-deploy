@@ -22,6 +22,11 @@ definitions:
         type: string
       restart:
         type: boolean
+      status:
+        allOf:
+        - $ref: '#/definitions/model.InstanceStatus'
+        description: Status is filled from the deployment backend on read and is never
+          persisted.
       updated_at:
         type: string
     type: object
@@ -30,6 +35,15 @@ definitions:
       name:
         type: string
       value: {}
+    type: object
+  model.InstanceStatus:
+    properties:
+      message:
+        type: string
+      running:
+        type: boolean
+      transitioning:
+        type: boolean
     type: object
 info:
   contact: {}
@@ -65,7 +79,8 @@ paths:
       - documentation
   /instances:
     get:
-      description: Returns import instances visible to the caller.
+      description: Returns import instances visible to the caller, including the current
+        container status.
       parameters:
       - default: 100
         description: Maximum number of results
@@ -190,7 +205,8 @@ paths:
       tags:
       - instances
     get:
-      description: Returns a single instance by id.
+      description: Returns a single instance by id, including the current container
+        status.
       parameters:
       - description: Instance id
         in: path
