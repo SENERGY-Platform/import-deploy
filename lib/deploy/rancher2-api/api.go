@@ -17,16 +17,20 @@
 package rancher2_api
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"github.com/SENERGY-Platform/import-deploy/lib/config"
-	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
-	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/parnurzeal/gorequest"
+	"github.com/SENERGY-Platform/import-deploy/lib/baggage"
+	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
+	"github.com/SENERGY-Platform/import-deploy/lib/httpreq"
+	"github.com/SENERGY-Platform/import-deploy/lib/log"
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
 )
 
 type Rancher2 struct {
@@ -44,16 +48,26 @@ func New(config config.Config) *Rancher2 {
 	return &Rancher2{config.RancherUrl, config.RancherAccessKey, config.RancherSecretKey, config.RancherNamespaceId, config.RancherProjectId, kubeUrl}
 }
 
-func (r *Rancher2) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, _ bool) (newId string, err error) {
-	err = r.RemoveContainer(id)
+// do sends a request to the Rancher API with the credentials, the trace and the
+// baggage of ctx attached.
+func (r *Rancher2) do(ctx context.Context, method string, url string, body any) (httpreq.Response, error) {
+	return httpreq.Do(ctx, httpreq.Request{
+		Method:    method,
+		URL:       url,
+		Body:      body,
+		BasicAuth: &httpreq.BasicAuth{User: r.accessKey, Password: r.secretKey},
+	})
+}
+
+func (r *Rancher2) UpdateContainer(ctx context.Context, id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, _ bool, bag map[string]string) (newId string, err error) {
+	err = r.RemoveContainer(ctx, id)
 	if err != nil {
 		return newId, err
 	}
-	return r.CreateContainer(name, image, env, restart, userid, importTypeId)
+	return r.CreateContainer(ctx, name, image, env, restart, userid, importTypeId, bag)
 }
 
-func (r *Rancher2) CreateContainer(name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (id string, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+func (r *Rancher2) CreateContainer(ctx context.Context, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, bag map[string]string) (id string, err error) {
 	r2Env := []Env{}
 	for k, v := range env {
 		r2Env = append(r2Env, Env{
@@ -66,6 +80,9 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 		"importId":     name,
 		"importTypeId": strings.ReplaceAll(importTypeId, ":", "_"),
 	}
+	// The selector below keeps the plain labels: it is immutable once the workload
+	// exists, while the baggage differs from one instance to the next.
+	podLabels := baggage.AddLabels(ctx, maps.Clone(labels), bag)
 	reqBody := &Request{
 		Name:        name,
 		NamespaceId: r.namespaceId,
@@ -84,9 +101,9 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 					"cpu":    "500m",
 				},
 			},
-			Labels: labels,
+			Labels: podLabels,
 		}},
-		Labels:     labels,
+		Labels:     podLabels,
 		Scheduling: Scheduling{Scheduler: "default-scheduler", Node: Node{RequireAll: []string{"role=worker"}}},
 	}
 
@@ -115,108 +132,93 @@ func (r *Rancher2) CreateContainer(name string, image string, env map[string]str
 			},
 		},
 	}
-	request.Method = "POST"
-	request.Url = r.url + "projects/" + r.projectId
+	url := r.url + "projects/" + r.projectId
 	if restart {
-		request.Url += "/workloads"
+		url += "/workloads"
 		reqBody.Selector = Selector{MatchLabels: labels}
 		autoscaleRequestBody.Spec.TargetRef.ApiVersion = "apps/v1"
 		autoscaleRequestBody.Spec.TargetRef.Kind = "Deployment"
 	} else {
-		request.Url += "/jobs"
+		url += "/jobs"
 		autoscaleRequestBody.Spec.TargetRef.ApiVersion = "batch/v1"
 		autoscaleRequestBody.Spec.TargetRef.Kind = "Job"
 	}
-	resp, body, e := request.Send(reqBody).End()
+	// The transport error is checked before the status, which the request library
+	// this replaced could not do: it returned a nil response together with the error
+	// and every call site read the status off it first.
+	resp, err := r.do(ctx, http.MethodPost, url, reqBody)
+	if err != nil {
+		return id, fmt.Errorf("rancher2 API - could not create import: %w", err)
+	}
 	if resp.StatusCode != http.StatusCreated {
-		err = errors.New("could not create import")
-		fmt.Print(body)
-		return
-	}
-	if len(e) > 0 {
-		err = errors.New("could not create import")
-		return
+		log.Logger.ErrorContext(ctx, "rancher2 API - could not create import", "status", resp.StatusCode, "response", resp.Text())
+		return id, errors.New("could not create import")
 	}
 
-	autoscaleRequest := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, body, e = autoscaleRequest.Post(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers").Send(autoscaleRequestBody).End()
+	resp, err = r.do(ctx, http.MethodPost, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalers", autoscaleRequestBody)
+	if err != nil {
+		return id, fmt.Errorf("rancher2 API - could not create import vpa: %w", err)
+	}
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
-		err = errors.New("could not create import")
-		fmt.Print(body)
-		return
+		log.Logger.ErrorContext(ctx, "rancher2 API - could not create import vpa", "status", resp.StatusCode, "response", resp.Text())
+		return id, errors.New("could not create import")
 	}
-	if len(e) > 0 {
-		err = errors.New("could not create import")
-		return
-	}
-	return name, err
+	return name, nil
 }
 
-func (r *Rancher2) RemoveContainer(id string) (err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, body, e := request.Delete(r.url + "projects/" + r.projectId + "/workloads/deployment:" +
-		r.namespaceId + ":" + id).End()
+func (r *Rancher2) RemoveContainer(ctx context.Context, id string) (err error) {
+	resp, err := r.do(ctx, http.MethodDelete, r.url+"projects/"+r.projectId+"/workloads/deployment:"+
+		r.namespaceId+":"+id, nil)
+	if err != nil {
+		return fmt.Errorf("rancher2 API - could not delete import: %w", err)
+	}
 	if resp.StatusCode == http.StatusNotFound {
-		resp, body, e = request.Delete(r.url + "projects/" + r.projectId + "/workloads/job:" +
-			r.namespaceId + ":" + id).End()
+		// An import that does not restart is a job rather than a deployment.
+		resp, err = r.do(ctx, http.MethodDelete, r.url+"projects/"+r.projectId+"/workloads/job:"+
+			r.namespaceId+":"+id, nil)
+		if err != nil {
+			return fmt.Errorf("rancher2 API - could not delete import: %w", err)
+		}
 	}
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
-		err = errors.New("could not delete import: " + body)
-		return
-	}
-	if len(e) > 0 {
-		err = errors.New("something went wrong")
-		return
+		return errors.New("could not delete import: " + resp.Text())
 	}
 
-	autoscaleRequest := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, body, e = autoscaleRequest.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalers/" +
-		r.namespaceId +
-		"/" +
-		id + "-vpa").
-		End()
+	resp, err = r.do(ctx, http.MethodDelete, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalers/"+
+		r.namespaceId+"/"+id+"-vpa", nil)
+	if err != nil {
+		return fmt.Errorf("rancher2 API - could not delete import vpa: %w", err)
+	}
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
-		err = errors.New("rancher2 API - could not delete operator vpa " + body)
-		return
-	}
-	if len(e) > 0 {
-		err = errors.New("something went wrong")
-		return
+		return errors.New("rancher2 API - could not delete import vpa " + resp.Text())
 	}
 
-	autoscaleCheckpointRequest := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, body, e = autoscaleCheckpointRequest.Delete(r.kubeUrl + "autoscaling.k8s.io.verticalpodautoscalercheckpoints/" +
-		r.namespaceId +
-		"/" +
-		id + "-vpa-" + id).
-		End()
+	resp, err = r.do(ctx, http.MethodDelete, r.kubeUrl+"autoscaling.k8s.io.verticalpodautoscalercheckpoints/"+
+		r.namespaceId+"/"+id+"-vpa-"+id, nil)
+	if err != nil {
+		return fmt.Errorf("rancher2 API - could not delete import vpa checkpoint: %w", err)
+	}
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
-		err = errors.New("rancher2 API - could not delete operator vpa checkpoint " + body)
-		return
-	}
-	if len(e) > 0 {
-		err = errors.New("something went wrong")
-		return
+		return errors.New("rancher2 API - could not delete import vpa checkpoint " + resp.Text())
 	}
 
-	return
+	return nil
 }
 
-func (r *Rancher2) ContainerExists(id string, _ *bool) (exists bool, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, _, errs := request.Get(r.url + "projects/" + r.projectId + "/workloads/deployment:" +
-		r.namespaceId + ":" + id).End()
-	if len(errs) > 0 {
-		return false, errs[0]
+func (r *Rancher2) ContainerExists(ctx context.Context, id string, _ *bool) (exists bool, err error) {
+	resp, err := r.do(ctx, http.MethodGet, r.url+"projects/"+r.projectId+"/workloads/deployment:"+
+		r.namespaceId+":"+id, nil)
+	if err != nil {
+		return false, err
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
 		return false, errors.New("unexpected status " + strconv.Itoa(resp.StatusCode))
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		resp, _, errs = request.Get(r.url + "projects/" + r.projectId + "/workloads/job:" +
-			r.namespaceId + ":" + id).End()
-		if len(errs) > 0 {
-			return false, errs[0]
+		resp, err = r.do(ctx, http.MethodGet, r.url+"projects/"+r.projectId+"/workloads/job:"+
+			r.namespaceId+":"+id, nil)
+		if err != nil {
+			return false, err
 		}
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
 			return false, errors.New("unexpected status " + strconv.Itoa(resp.StatusCode))
@@ -226,11 +228,11 @@ func (r *Rancher2) ContainerExists(id string, _ *bool) (exists bool, err error) 
 	return true, nil
 }
 
-func (r *Rancher2) GetContainerStatus(_ string, _ *bool) (status model.InstanceStatus, err error) {
+func (r *Rancher2) GetContainerStatus(_ context.Context, _ string, _ *bool) (status model.InstanceStatus, err error) {
 	return status, deploy.ErrNotSupported
 }
 
-func (r *Rancher2) GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error) {
+func (r *Rancher2) GetContainerStatuses(_ context.Context) (statuses map[string]model.InstanceStatus, err error) {
 	return nil, deploy.ErrNotSupported
 }
 

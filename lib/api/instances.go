@@ -97,7 +97,7 @@ func listInstancesHandler(control Controller) gin.HandlerFunc {
 		}
 
 		includeGenerated := strings.ToLower(c.Query("exclude_generated")) != "true"
-		results, err, errCode := control.ListInstances(token, limitInt, offsetInt, orderBy, asc, search, includeGenerated, ids)
+		results, err, errCode := control.ListInstances(c.Request.Context(), token, limitInt, offsetInt, orderBy, asc, search, includeGenerated, ids)
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
@@ -129,7 +129,7 @@ func countInstancesHandler(control Controller) gin.HandlerFunc {
 		search := c.Query("search")
 		includeGenerated := strings.ToLower(c.Query("exclude_generated")) != "true"
 
-		count, err, errCode := control.CountInstances(token, search, includeGenerated)
+		count, err, errCode := control.CountInstances(c.Request.Context(), token, search, includeGenerated)
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
@@ -158,7 +158,7 @@ func readInstanceHandler(control Controller) gin.HandlerFunc {
 			return
 		}
 		id := c.Param("id")
-		result, err, errCode := control.ReadInstance(id, token)
+		result, err, errCode := control.ReadInstance(c.Request.Context(), id, token)
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
@@ -186,7 +186,7 @@ func deleteInstanceHandler(control Controller) gin.HandlerFunc {
 			return
 		}
 		id := c.Param("id")
-		err, errCode := control.DeleteInstance(id, token)
+		err, errCode := control.DeleteInstance(c.Request.Context(), id, token)
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
@@ -227,7 +227,7 @@ func setInstanceHandler(control Controller) gin.HandlerFunc {
 			_ = c.Error(errors.Join(model.ErrBadRequest, errors.New("IDs don't match")))
 			return
 		}
-		err, code := control.SetInstance(instance, token)
+		err, code := control.SetInstance(c.Request.Context(), instance, token)
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(code), err))
 			return
@@ -262,7 +262,7 @@ func createInstanceHandler(control Controller) gin.HandlerFunc {
 			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
 		}
-		result, err, code := control.CreateInstance(instance, token)
+		result, err, code := control.CreateInstance(c.Request.Context(), instance, token)
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(code), err))
 			return

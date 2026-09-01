@@ -47,8 +47,12 @@ func New(config config.Config, ctx context.Context, wg *sync.WaitGroup) (client 
 	return &DockerClient{config: config, cli: cli}, nil
 }
 
-func (this *DockerClient) CreateContainer(name string, refStr string, env map[string]string, restart bool, _ string, _ string) (id string, err error) {
-	ctx, _ := util.GetTimeoutContext()
+// The baggage reaches a local container through the BAGGAGE environment variable
+// only: docker has no pod labels for a log aggregation to read, and this mode is
+// local development.
+func (this *DockerClient) CreateContainer(ctx context.Context, name string, refStr string, env map[string]string, restart bool, _ string, _ string, _ map[string]string) (id string, err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
 	if this.config.DockerPull == true {
 		_, err = this.cli.ImagePull(ctx, refStr, image.PullOptions{})
 		if err != nil {
@@ -83,28 +87,29 @@ func (this *DockerClient) CreateContainer(name string, refStr string, env map[st
 	return resp.ID, err
 }
 
-func (this *DockerClient) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, _ bool) (newId string, err error) {
-	err = this.RemoveContainer(id)
+func (this *DockerClient) UpdateContainer(ctx context.Context, id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, _ bool, bag map[string]string) (newId string, err error) {
+	err = this.RemoveContainer(ctx, id)
 	if err != nil {
 		return newId, err
 	}
-	return this.CreateContainer(name, image, env, restart, userid, importTypeId)
+	return this.CreateContainer(ctx, name, image, env, restart, userid, importTypeId, bag)
 }
 
-func (this *DockerClient) RemoveContainer(id string) (err error) {
-	err = this.stopContainer(id)
+func (this *DockerClient) RemoveContainer(ctx context.Context, id string) (err error) {
+	err = this.stopContainer(ctx, id)
 	if err != nil {
 		return err
 	}
-	err = this.removeContainer(id)
+	err = this.removeContainer(ctx, id)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (this *DockerClient) ContainerExists(id string, _ *bool) (exists bool, err error) {
-	ctx, _ := util.GetTimeoutContext()
+func (this *DockerClient) ContainerExists(ctx context.Context, id string, _ *bool) (exists bool, err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
 	_, err = this.cli.ContainerInspect(ctx, id)
 	if err != nil {
 		if docker.IsErrNotFound(err) {
@@ -115,8 +120,9 @@ func (this *DockerClient) ContainerExists(id string, _ *bool) (exists bool, err 
 	return true, nil
 }
 
-func (this *DockerClient) GetContainerStatus(id string, _ *bool) (status model.InstanceStatus, err error) {
-	ctx, _ := util.GetTimeoutContext()
+func (this *DockerClient) GetContainerStatus(ctx context.Context, id string, _ *bool) (status model.InstanceStatus, err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
 	inspect, err := this.cli.ContainerInspect(ctx, id)
 	if err != nil {
 		if docker.IsErrNotFound(err) {
@@ -127,8 +133,9 @@ func (this *DockerClient) GetContainerStatus(id string, _ *bool) (status model.I
 	return containerStatus(inspect.State.Status), nil
 }
 
-func (this *DockerClient) GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error) {
-	ctx, _ := util.GetTimeoutContext()
+func (this *DockerClient) GetContainerStatuses(ctx context.Context) (statuses map[string]model.InstanceStatus, err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
 	list, err := this.cli.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		return nil, err

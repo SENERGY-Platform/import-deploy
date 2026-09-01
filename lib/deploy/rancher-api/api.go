@@ -17,16 +17,19 @@
 package rancher_api
 
 import (
+	"context"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
-	"github.com/SENERGY-Platform/import-deploy/lib/config"
-	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
-	"github.com/SENERGY-Platform/import-deploy/lib/model"
-	"github.com/hashicorp/go-uuid"
-	"github.com/parnurzeal/gorequest"
+	"fmt"
 	"net/http"
 	"strconv"
+
+	"github.com/SENERGY-Platform/import-deploy/lib/baggage"
+	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
+	"github.com/SENERGY-Platform/import-deploy/lib/httpreq"
+	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	"github.com/hashicorp/go-uuid"
 )
 
 type Rancher struct {
@@ -40,12 +43,23 @@ func New(config config.Config) *Rancher {
 	return &Rancher{config.RancherUrl, config.RancherAccessKey, config.RancherSecretKey, config.RancherStackId}
 }
 
-func (r Rancher) CreateContainer(name string, image string, env map[string]string, restart bool, _ string, _ string) (id string, err error) {
-	id, err, _ = r.createContainer(name, image, env, restart)
+// do sends a request to the Rancher API with the credentials, the trace and the
+// baggage of ctx attached.
+func (r Rancher) do(ctx context.Context, method string, url string, body any) (httpreq.Response, error) {
+	return httpreq.Do(ctx, httpreq.Request{
+		Method:    method,
+		URL:       url,
+		Body:      body,
+		BasicAuth: &httpreq.BasicAuth{User: r.accessKey, Password: r.secretKey},
+	})
+}
+
+func (r Rancher) CreateContainer(ctx context.Context, name string, image string, env map[string]string, restart bool, _ string, _ string, bag map[string]string) (id string, err error) {
+	id, err, _ = r.createContainer(ctx, name, image, env, restart, bag)
 	return id, err
 }
 
-func (r Rancher) createContainer(name string, image string, env map[string]string, restart bool) (id string, err error, code int) {
+func (r Rancher) createContainer(ctx context.Context, name string, image string, env map[string]string, restart bool, bag map[string]string) (id string, err error, code int) {
 	labels := map[string]string{
 		"io.rancher.container.pull_image":          "always",
 		"io.rancher.scheduler.affinity:host_label": "role=worker",
@@ -53,8 +67,7 @@ func (r Rancher) createContainer(name string, image string, env map[string]strin
 	if !restart {
 		labels["io.rancher.container.start_once"] = "true"
 	}
-
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
+	labels = baggage.AddLabels(ctx, labels, bag)
 
 	reqBody := &Request{
 		Type:          "service",
@@ -69,44 +82,43 @@ func (r Rancher) createContainer(name string, image string, env map[string]strin
 		},
 	}
 
-	resp, body, e := request.Post(r.url + "services").Send(reqBody).End()
+	// The transport error is checked before the status, which the request library
+	// this replaced could not do: it returned a nil response together with the error
+	// and every call site read the status off it first.
+	resp, err := r.do(ctx, http.MethodPost, r.url+"services", reqBody)
+	if err != nil {
+		return id, fmt.Errorf("rancher API - could not create instance: %w", err), 0
+	}
 	code = resp.StatusCode
 	if resp.StatusCode != http.StatusCreated {
-		err = errors.New("could not create instance")
-		return
-	}
-	if len(e) > 0 {
-		err = errors.New("could not create instance")
-		return
+		return id, errors.New("could not create instance: " + resp.Text()), code
 	}
 
 	data := map[string]interface{}{}
-	err = json.Unmarshal([]byte(body), &data)
+	err = resp.Decode(&data)
 	if err != nil {
-		return
+		return id, err, code
 	}
 	id, ok := data["id"].(string)
 	if !ok {
 		return id, errors.New("could not get service id"), code
 	}
-	return
+	return id, nil, code
 }
 
-func (r Rancher) RemoveContainer(id string) (err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, body, e := request.Delete(r.url + "services/" + id).End()
-	if len(e) > 0 {
-		err = errors.New("could not delete instance: " + body)
-		return
+func (r Rancher) RemoveContainer(ctx context.Context, id string) (err error) {
+	resp, err := r.do(ctx, http.MethodDelete, r.url+"services/"+id, nil)
+	if err != nil {
+		return fmt.Errorf("rancher API - could not delete instance: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return errors.New("unexpected status code while removing container " + strconv.Itoa(resp.StatusCode))
+		return errors.New("unexpected status code while removing container " + strconv.Itoa(resp.StatusCode) + ": " + resp.Text())
 	}
-	return
+	return nil
 }
 
-func (r Rancher) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, _ string, _ string, _ bool) (newId string, err error) {
-	err = r.RemoveContainer(id)
+func (r Rancher) UpdateContainer(ctx context.Context, id string, name string, image string, env map[string]string, restart bool, _ string, _ string, _ bool, bag map[string]string) (newId string, err error) {
+	err = r.RemoveContainer(ctx, id)
 	if err != nil {
 		return newId, err
 	}
@@ -116,7 +128,7 @@ func (r Rancher) UpdateContainer(id string, name string, image string, env map[s
 			return newId, err
 		}
 		rand := binary.BigEndian.Uint64(bytes)
-		newId, err, code := r.createContainer(name+"-"+strconv.FormatUint(rand, 16), image, env, restart)
+		newId, err, code := r.createContainer(ctx, name+"-"+strconv.FormatUint(rand, 16), image, env, restart, bag)
 		if err != nil {
 			return newId, err
 		}
@@ -127,11 +139,10 @@ func (r Rancher) UpdateContainer(id string, name string, image string, env map[s
 	}
 }
 
-func (r Rancher) ContainerExists(id string, _ *bool) (exists bool, err error) {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, _, errs := request.Get(r.url + "services/" + id).End()
-	if len(errs) > 0 {
-		return false, errs[0]
+func (r Rancher) ContainerExists(ctx context.Context, id string, _ *bool) (exists bool, err error) {
+	resp, err := r.do(ctx, http.MethodGet, r.url+"services/"+id, nil)
+	if err != nil {
+		return false, err
 	}
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
 		return false, errors.New("unexpected status " + strconv.Itoa(resp.StatusCode))
@@ -139,20 +150,14 @@ func (r Rancher) ContainerExists(id string, _ *bool) (exists bool, err error) {
 	return resp.StatusCode == http.StatusOK, nil
 }
 
-func (r Rancher) GetContainerStatus(_ string, _ *bool) (status model.InstanceStatus, err error) {
+func (r Rancher) GetContainerStatus(_ context.Context, _ string, _ *bool) (status model.InstanceStatus, err error) {
 	return status, deploy.ErrNotSupported
 }
 
-func (r Rancher) GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error) {
+func (r Rancher) GetContainerStatuses(_ context.Context) (statuses map[string]model.InstanceStatus, err error) {
 	return nil, deploy.ErrNotSupported
 }
 
 func (r Rancher) Disconnect() (err error) {
 	return nil // not needed
-}
-
-func (r Rancher) exists(id string) bool {
-	request := gorequest.New().SetBasicAuth(r.accessKey, r.secretKey)
-	resp, _, _ := request.Get(r.url + "services/" + id).End()
-	return resp.StatusCode == http.StatusOK
 }

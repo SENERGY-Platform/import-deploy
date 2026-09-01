@@ -43,6 +43,7 @@ Simply set these environment variables (default values in brackets):
   * RANCHER_PROJECT_ID: project to deploy containers in ("") 
   * RANCHER_NAMESPACE_ID: namespace to deploy containers in ("")
 * DEBUG: whether to print debug output (true)
+* OTEL_ENDPOINT: OTLP collector traces are exported to ("", meaning the in-cluster Jaeger)
 
 ## Data model
 
@@ -68,11 +69,32 @@ Simply set these environment variables (default values in brackets):
   "owner": string,
   "generated": bool,  
   "created_at": string,
-  "updated_at": string
+  "updated_at": string,
+  "baggage": {string: string}
 }
 ```
 
 service_id and owner are hidden from the user. id, image and kafka_topic may not be set manually.
+
+## OpenTelemetry
+
+An incoming request brings its trace context and its baggage with it, and the baggage
+of the request that created an instance is stored on that instance. It reaches the
+import container twice, because the two consumers differ: as pod labels, which the log
+aggregation attaches to every container log line, and as the BAGGAGE environment
+variable, which [import-lib](https://github.com/SENERGY-Platform/import-lib) reads to
+put the same fields into the import's own log records. A caller that sends its smart
+service instance id this way finds every log line of the resulting import under it.
+
+The instance's own id joins the baggage as `import_id` once it has been generated.
+Labels are a best-effort index: a value Kubernetes would refuse -- over 63 characters,
+or a username that is an email address -- is left out of them rather than sanitized,
+while the environment variable carries the complete baggage. The pod labels are
+prefixed with `baggage.senergy.infai.org/`; the workload's own labels and the
+deployment selector stay as they were.
+
+A value sent in the `baggage` field of a request body is ignored. Docker mode gets the
+environment variable only: there are no pod labels to read there.
 
 ## API
 

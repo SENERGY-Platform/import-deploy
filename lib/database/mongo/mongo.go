@@ -32,6 +32,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/bsoncodec"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 )
 
 type Mongo struct {
@@ -43,7 +44,10 @@ type Mongo struct {
 var CreateCollections = []func(db *Mongo) error{}
 
 func New(perm permV2Client.Client, conf config.Config, ctx context.Context, wg *sync.WaitGroup) (*Mongo, error) {
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(conf.MongoUrl))
+	// The monitor gives every query a span under the trace of the request that
+	// caused it, so a slow read shows up next to the handler that waited for it. It
+	// needs an initialized OpenTelemetry, which lib.Start does before calling here.
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(conf.MongoUrl).SetMonitor(otelmongo.NewMonitor()))
 	if err != nil {
 		return nil, err
 	}

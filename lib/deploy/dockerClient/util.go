@@ -28,7 +28,8 @@ func (this *DockerClient) listAllContainers() (containers []types.Container, err
 }
 
 func (this *DockerClient) stopAllContainers() (err error) {
-	ctx, _ := util.GetTimeoutContext()
+	ctx, cf := util.GetTimeoutContext(context.Background())
+	defer cf()
 
 	containers, err := this.listAllContainers()
 	if err != nil {
@@ -60,14 +61,12 @@ func (this *DockerClient) removeAllContainers() (err error) {
 	return nil
 }
 
-func (this *DockerClient) stopContainer(id string) (err error) {
-	ctx := context.Background()
+func (this *DockerClient) stopContainer(ctx context.Context, id string) (err error) {
 	err = this.cli.ContainerStop(ctx, id, container.StopOptions{})
 	return err
 }
 
-func (this *DockerClient) removeContainer(id string) (err error) {
-	ctx := context.Background()
+func (this *DockerClient) removeContainer(ctx context.Context, id string) (err error) {
 	removeOptions := container.RemoveOptions{Force: true}
 
 	return this.cli.ContainerRemove(ctx, id, removeOptions)

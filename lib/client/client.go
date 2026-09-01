@@ -14,26 +14,45 @@
  * limitations under the License.
  */
 
+// Package client talks to import-deploy.
+//
+// Every call has a Context variant. Use it: it carries the caller's trace and
+// baggage onto the wire, which is what lets import-deploy -- and the import
+// container it deploys -- log under the context of whatever caused the call. A
+// smart service worker that passes its instance id this way gets it back on every
+// log line the resulting import ever writes.
+//
+// The variants without a context are kept so existing callers still build. They
+// pass context.TODO(), so import-deploy starts a trace of its own and the
+// connection to the caller is lost.
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/SENERGY-Platform/gin-middleware/otelx"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
 	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 )
 
 type Interface interface {
 	ListInstances(jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, forUser string) (results []model.Instance, err error, errCode int)
+	ListInstancesContext(ctx context.Context, jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, forUser string) (results []model.Instance, err error, errCode int)
 	ReadInstance(id string, jwt jwt.Token, forUser string) (result model.Instance, err error, errCode int)
+	ReadInstanceContext(ctx context.Context, id string, jwt jwt.Token, forUser string) (result model.Instance, err error, errCode int)
 	CreateInstance(instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int)
+	CreateInstanceContext(ctx context.Context, instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int)
 	SetInstance(importType model.Instance, jwt jwt.Token) (err error, code int)
+	SetInstanceContext(ctx context.Context, importType model.Instance, jwt jwt.Token) (err error, code int)
 	DeleteInstance(id string, jwt jwt.Token, forUser string) (err error, errCode int)
+	DeleteInstanceContext(ctx context.Context, id string, jwt jwt.Token, forUser string) (err error, errCode int)
 	CountInstances(jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int)
+	CountInstancesContext(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int)
 }
 
 type Client struct {
@@ -42,6 +61,19 @@ type Client struct {
 
 func NewClient(baseUrl string) Interface {
 	return &Client{baseUrl: baseUrl}
+}
+
+// newRequest builds a request that carries the caller's trace and baggage. The
+// injection is best-effort: a context that cannot be spelled as a header costs the
+// correlation, not the call.
+func newRequest(ctx context.Context, method string, url string, body io.Reader, token jwt.Token) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", prefixTokenIfNeeded(token))
+	_ = otelx.InjectContextToRequest(ctx, req)
+	return req, nil
 }
 
 func do[T any](req *http.Request) (result T, err error, code int) {

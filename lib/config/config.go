@@ -55,6 +55,10 @@ type Config struct {
 	SkipKafkaAdmin                        bool     `json:"skip_kafka_admin"`
 	LogHandler                            string   `json:"log_handler"`
 	ImagePullSecrets                      []string `json:"image_pull_secrets"`
+	// OtelEndpoint is the OTLP collector traces are exported to. Empty means the
+	// in-cluster Jaeger the otelx default names, which is what every deployment
+	// outside a local test uses.
+	OtelEndpoint string `json:"otel_endpoint"`
 }
 
 // loads config from json in location and used environment variables (e.g ZookeeperUrl --> ZOOKEEPER_URL)

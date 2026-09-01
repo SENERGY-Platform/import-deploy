@@ -109,7 +109,7 @@ func (this *Mongo) instanceCollection() *mongo.Collection {
 }
 
 func (this *Mongo) GetInstance(ctx context.Context, id string, jwt jwt.Token) (instance model.Instance, exists bool, err error) {
-	ok, err, _ := this.perm.CheckPermission(jwt.Token, model.PermV2InstanceTopic, id, permV2Client.Read)
+	ok, err, _ := this.perm.CheckPermissionContext(ctx, jwt.Token, model.PermV2InstanceTopic, id, permV2Client.Read)
 	if err != nil {
 		return instance, false, err
 	}
@@ -143,7 +143,7 @@ func (this *Mongo) AdminListInstances(ctx context.Context, limit int64, offset i
 }
 
 func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool, requestedIds []string) (result []model.Instance, err error) {
-	ids, err, _ := this.perm.ListAccessibleResourceIds(jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
+	ids, err, _ := this.perm.ListAccessibleResourceIdsContext(ctx, jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func (this *Mongo) CreateInstance(ctx context.Context, instance model.Instance, 
 		UserPermissions:  map[string]permV2Client.PermissionsMap{},
 		RolePermissions:  map[string]model2.PermissionsMap{},
 	}
-	permResource, err, code := this.perm.GetResource(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id)
+	permResource, err, code := this.perm.GetResourceContext(ctx, permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id)
 	if err != nil && code != http.StatusNotFound {
 		return err
 	}
@@ -252,12 +252,12 @@ func (this *Mongo) CreateInstance(ctx context.Context, instance model.Instance, 
 		permissions.RolePermissions = permResource.RolePermissions
 	}
 	model.SetDefaultPermissions(instance, permissions)
-	_, err, _ = this.perm.SetPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions)
+	_, err, _ = this.perm.SetPermissionContext(ctx, permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions)
 	return err
 }
 
 func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error {
-	ok, err, _ := this.perm.CheckPermission(jwt.Token, model.PermV2InstanceTopic, instance.Id, permV2Client.Write)
+	ok, err, _ := this.perm.CheckPermissionContext(ctx, jwt.Token, model.PermV2InstanceTopic, instance.Id, permV2Client.Write)
 	if err != nil {
 		return err
 	}
@@ -279,14 +279,14 @@ func (this *Mongo) SetInstance(ctx context.Context, instance model.Instance, jwt
 }
 
 func (this *Mongo) RemoveInstance(ctx context.Context, id string, jwt jwt.Token) error {
-	ok, err, _ := this.perm.CheckPermission(jwt.Token, model.PermV2InstanceTopic, id, permV2Client.Administrate)
+	ok, err, _ := this.perm.CheckPermissionContext(ctx, jwt.Token, model.PermV2InstanceTopic, id, permV2Client.Administrate)
 	if err != nil {
 		return err
 	}
 	if !ok {
 		return errors.New("requested instance nonexistent or missing rights")
 	}
-	err, _ = this.perm.RemoveResource(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, id)
+	err, _ = this.perm.RemoveResourceContext(ctx, permV2Client.InternalAdminToken, model.PermV2InstanceTopic, id)
 	if err != nil {
 		return err
 	}
@@ -295,7 +295,7 @@ func (this *Mongo) RemoveInstance(ctx context.Context, id string, jwt jwt.Token)
 }
 
 func (this *Mongo) CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (int64, error) {
-	ids, err, _ := this.perm.ListAccessibleResourceIds(jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
+	ids, err, _ := this.perm.ListAccessibleResourceIdsContext(ctx, jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
 	if err != nil {
 		return 0, err
 	}

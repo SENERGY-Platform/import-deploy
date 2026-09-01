@@ -50,7 +50,7 @@ func New(conf config.Config, perm permV2Client.Client, ctx context.Context, wg *
 
 func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ctx context.Context) error {
 	log.Logger.Info("ensure permissions-v2 topic")
-	_, err, _ := perm.SetTopic(permV2Client.InternalAdminToken, permV2Client.Topic{
+	_, err, _ := perm.SetTopicContext(ctx, permV2Client.InternalAdminToken, permV2Client.Topic{
 		Id: model.PermV2InstanceTopic,
 		DefaultPermissions: permV2Client.ResourcePermissions{
 			RolePermissions: map[string]model2.PermissionsMap{
@@ -78,7 +78,7 @@ func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ct
 		return err
 	}
 
-	permResources, err, _ := perm.ListResourcesWithAdminPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, permV2Client.ListOptions{})
+	permResources, err, _ := perm.ListResourcesWithAdminPermissionContext(ctx, permV2Client.InternalAdminToken, model.PermV2InstanceTopic, permV2Client.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ct
 
 		model.SetDefaultPermissions(instance, permissions)
 
-		_, err, _ = perm.SetPermission(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions)
+		_, err, _ = perm.SetPermissionContext(ctx, permV2Client.InternalAdminToken, model.PermV2InstanceTopic, instance.Id, permissions)
 		if err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ func migrate(config config.Config, db *mongo.Mongo, perm permV2Client.Client, ct
 
 	for _, permResouceId := range permResouceIds {
 		if !slices.Contains(dbIds, permResouceId) {
-			err, _ = perm.RemoveResource(permV2Client.InternalAdminToken, model.PermV2InstanceTopic, permResouceId)
+			err, _ = perm.RemoveResourceContext(ctx, permV2Client.InternalAdminToken, model.PermV2InstanceTopic, permResouceId)
 			if err != nil {
 				return err
 			}

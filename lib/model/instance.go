@@ -36,6 +36,12 @@ type Instance struct {
 	Generated    bool             `json:"generated"`
 	// Status is filled from the deployment backend on read and is never persisted.
 	Status *InstanceStatus `json:"status,omitempty" bson:"-"`
+	// Baggage is the OpenTelemetry context of the caller that created this instance.
+	// It is set from the request rather than from the payload -- a value sent in the
+	// body is ignored -- and handed to the container as pod labels and as the BAGGAGE
+	// environment variable, so that every log line about this import can be traced
+	// back to that context.
+	Baggage map[string]string `json:"baggage,omitempty"`
 }
 
 // InstanceStatus describes the current state of the container running an instance.

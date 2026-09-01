@@ -21,6 +21,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/SENERGY-Platform/gin-middleware/otelx"
 	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
 	"github.com/SENERGY-Platform/import-deploy/lib/api"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
@@ -38,6 +39,17 @@ import (
 
 func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err error) {
 	wg = &sync.WaitGroup{}
+
+	// Before anything else. The mongo monitor needs an initialized OpenTelemetry, and
+	// the restore below deploys containers, which should already run under a trace.
+	// The setup happens once per process; the call api.Start makes for its handler
+	// only hands the handler back.
+	_, err = otelx.GinOpenTelemetry(ctx, api.ServiceName, conf.OtelEndpoint)
+	if err != nil {
+		log.Logger.Error("unable to set up OpenTelemetry", attributes.ErrorKey, err)
+		return wg, err
+	}
+
 	perm := permV2Client.New(conf.PermissionV2Url)
 	data, err := database.New(conf, perm, ctx, wg)
 	if err != nil {
@@ -71,13 +83,13 @@ func Start(conf config.Config, ctx context.Context) (wg *sync.WaitGroup, err err
 
 	if conf.StartupEnsureDeployed {
 		log.Logger.Info("Restoring missing import containers")
-		err = ctrl.EnsureAllInstancesDeployed()
+		err = ctrl.EnsureAllInstancesDeployed(ctx)
 		if err != nil {
 			return wg, err
 		}
 	}
 
-	err = api.Start(conf, ctrl)
+	err = api.Start(ctx, conf, ctrl)
 	if err != nil {
 		log.Logger.Error("unable to start api", attributes.ErrorKey, err)
 		return wg, err

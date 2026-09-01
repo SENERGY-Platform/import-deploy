@@ -1,11 +1,14 @@
 package kubernetes_api
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 
+	"github.com/SENERGY-Platform/import-deploy/lib/baggage"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
@@ -61,8 +64,8 @@ func New(config config.Config) (client deploy.DeploymentClient, err error) {
 	return &k8s{clientset, autoscalerClientSet, config}, nil
 }
 
-func (this *k8s) CreateContainer(name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (id string, err error) {
-	ctx, cf := util.GetTimeoutContext()
+func (this *k8s) CreateContainer(ctx context.Context, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, bag map[string]string) (id string, err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
 	defer cf()
 	container := getContainer(name, image, env)
 	labels := map[string]string{
@@ -70,10 +73,11 @@ func (this *k8s) CreateContainer(name string, image string, env map[string]strin
 		"importId":     name,
 		"importTypeId": strings.ReplaceAll(importTypeId, ":", "_"),
 	}
+	podLabels := baggage.AddLabels(ctx, maps.Clone(labels), bag)
 	var targetRef *autoscalingv1.CrossVersionObjectReference
 	if restart {
 		// create deployment
-		deployment := getDeployment(name, labels, container, this.config.ImagePullSecrets)
+		deployment := getDeployment(name, labels, podLabels, container, this.config.ImagePullSecrets)
 		_, err = this.clientset.AppsV1().Deployments(this.config.RancherNamespaceId).Create(ctx, deployment, metav1.CreateOptions{})
 		if err != nil {
 			return "", fmt.Errorf("failed to create deployment: %v", err)
@@ -84,7 +88,7 @@ func (this *k8s) CreateContainer(name string, image string, env map[string]strin
 		}
 	} else {
 		// create job
-		job := getJob(name, labels, container)
+		job := getJob(name, podLabels, container)
 		_, err = this.clientset.BatchV1().Jobs(this.config.RancherNamespaceId).Create(ctx, job, metav1.CreateOptions{})
 		if err != nil {
 			return "", fmt.Errorf("failed to create job: %v", err)
@@ -126,18 +130,18 @@ func (this *k8s) CreateContainer(name string, image string, env map[string]strin
 	return name, nil
 }
 
-func (this *k8s) UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, existingRestart bool) (newId string, err error) {
+func (this *k8s) UpdateContainer(ctx context.Context, id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, existingRestart bool, bag map[string]string) (newId string, err error) {
 	if existingRestart != restart || !restart {
 		// cannot update restart policy, need to delete and recreate
 		// cannot update jobs, need to delete and recreate
-		err = this.RemoveContainer(id)
+		err = this.RemoveContainer(ctx, id)
 		if err != nil {
 			return newId, err
 		}
-		return this.CreateContainer(name, image, env, restart, userid, importTypeId)
+		return this.CreateContainer(ctx, name, image, env, restart, userid, importTypeId, bag)
 	} else {
 		// update deployment
-		ctx, cf := util.GetTimeoutContext()
+		ctx, cf := util.GetTimeoutContext(ctx)
 		defer cf()
 		container := getContainer(name, image, env)
 		labels := map[string]string{
@@ -145,7 +149,7 @@ func (this *k8s) UpdateContainer(id string, name string, image string, env map[s
 			"importId":     name,
 			"importTypeId": strings.ReplaceAll(importTypeId, ":", "_"),
 		}
-		deployment := getDeployment(name, labels, container, this.config.ImagePullSecrets)
+		deployment := getDeployment(name, labels, baggage.AddLabels(ctx, maps.Clone(labels), bag), container, this.config.ImagePullSecrets)
 		_, err = this.clientset.AppsV1().Deployments(this.config.RancherNamespaceId).Update(ctx, deployment, metav1.UpdateOptions{})
 		if err != nil {
 			return "", fmt.Errorf("failed to update deployment: %v", err)
@@ -154,8 +158,8 @@ func (this *k8s) UpdateContainer(id string, name string, image string, env map[s
 	}
 }
 
-func (this *k8s) RemoveContainer(id string) (err error) {
-	ctx, cf := util.GetTimeoutContext()
+func (this *k8s) RemoveContainer(ctx context.Context, id string) (err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
 	defer cf()
 	var supErr error
 	mux := sync.Mutex{}
@@ -227,8 +231,8 @@ func (this *k8s) RemoveContainer(id string) (err error) {
 	return supErr
 }
 
-func (this *k8s) ContainerExists(id string, restart *bool) (exists bool, err error) {
-	ctx, cf := util.GetTimeoutContext()
+func (this *k8s) ContainerExists(ctx context.Context, id string, restart *bool) (exists bool, err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
 	defer cf()
 	found := false
 	if restart == nil || *restart { // default => restart enabled => deployment
@@ -249,8 +253,8 @@ func (this *k8s) ContainerExists(id string, restart *bool) (exists bool, err err
 	return found, nil
 }
 
-func (this *k8s) GetContainerStatus(id string, restart *bool) (status model.InstanceStatus, err error) {
-	ctx, cf := util.GetTimeoutContext()
+func (this *k8s) GetContainerStatus(ctx context.Context, id string, restart *bool) (status model.InstanceStatus, err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
 	defer cf()
 	if restart == nil || *restart { // default => restart enabled => deployment
 		deployment, err := this.clientset.AppsV1().Deployments(this.config.RancherNamespaceId).Get(ctx, id, metav1.GetOptions{})
@@ -272,8 +276,8 @@ func (this *k8s) GetContainerStatus(id string, restart *bool) (status model.Inst
 	return jobStatus(job), nil
 }
 
-func (this *k8s) GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error) {
-	ctx, cf := util.GetTimeoutContext()
+func (this *k8s) GetContainerStatuses(ctx context.Context) (statuses map[string]model.InstanceStatus, err error) {
+	ctx, cf := util.GetTimeoutContext(ctx)
 	defer cf()
 	statuses = map[string]model.InstanceStatus{}
 	var supErr error
@@ -384,7 +388,11 @@ func getContainer(name string, image string, env map[string]string) corev1.Conta
 	}
 }
 
-func getDeployment(name string, labels map[string]string, container corev1.Container, imagePullSecrets []string) *appsv1.Deployment {
+// getDeployment keeps the selector on the plain labels and puts the baggage-carrying
+// ones on the pod template only: a deployment's selector is immutable, so a workload
+// created before an instance carried baggage could no longer be updated, and the log
+// aggregation reads pod labels anyway.
+func getDeployment(name string, labels map[string]string, podLabels map[string]string, container corev1.Container, imagePullSecrets []string) *appsv1.Deployment {
 	pullsecrets := []corev1.LocalObjectReference{}
 	for _, secret := range imagePullSecrets {
 		pullsecrets = append(pullsecrets, corev1.LocalObjectReference{Name: secret})
@@ -399,7 +407,7 @@ func getDeployment(name string, labels map[string]string, container corev1.Conta
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels: podLabels,
 				},
 				Spec: corev1.PodSpec{
 					Containers:       []corev1.Container{container},

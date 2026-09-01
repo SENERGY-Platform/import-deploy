@@ -401,6 +401,13 @@
         "model.Instance": {
             "type": "object",
             "properties": {
+                "baggage": {
+                    "description": "Baggage is the OpenTelemetry context of the caller that created this instance.\nIt is set from the request rather than from the payload -- a value sent in the\nbody is ignored -- and handed to the container as pod labels and as the BAGGAGE\nenvironment variable, so that every log line about this import can be traced\nback to that context.",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
                 "configs": {
                     "type": "array",
                     "items": {

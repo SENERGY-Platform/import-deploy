@@ -22,6 +22,7 @@ import (
 
 	slogger "github.com/SENERGY-Platform/go-service-base/struct-logger"
 	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
+	"github.com/SENERGY-Platform/go-service-base/struct-logger/handlers"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
 )
 
@@ -47,7 +48,12 @@ func Init(config config.Config) {
 		slog.String(attributes.OrganizationKey, "github.com/SENERGY-Platform"),
 	})
 
-	Logger = slog.New(handler)
+	// Wrapped on the outside of the configured handler so its attributes and level
+	// still apply. Every *Context log call whose context carries baggage now writes
+	// those entries as attributes, which is what makes a log line about an import
+	// findable by the caller's context; it also mirrors the record onto the active
+	// span.
+	Logger = slog.New(handlers.NewOpenTelemetryHandler(handler))
 
 	Logger.Debug("Logger Init")
 }

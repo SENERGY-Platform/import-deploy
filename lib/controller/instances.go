@@ -17,6 +17,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math"
@@ -24,7 +25,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SENERGY-Platform/gin-middleware/otelx"
 	"github.com/SENERGY-Platform/go-service-base/struct-logger/attributes"
+	"github.com/SENERGY-Platform/import-deploy/lib/baggage"
 	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
 	"github.com/SENERGY-Platform/import-deploy/lib/log"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
@@ -37,27 +40,28 @@ import (
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-func (this *Controller) ListInstances(jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string) (results []model.Instance, err error, errCode int) {
-	ctx, _ := util.GetTimeoutContext()
-	results, err = this.db.ListInstances(ctx, limit, offset, sort, jwt, asc, search, includeGenerated, ids)
+func (this *Controller) ListInstances(ctx context.Context, jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string) (results []model.Instance, err error, errCode int) {
+	dbCtx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
+	results, err = this.db.ListInstances(dbCtx, limit, offset, sort, jwt, asc, search, includeGenerated, ids)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}
-	this.addStatuses(results)
+	this.addStatuses(ctx, results)
 	return results, nil, http.StatusOK
 }
 
 // addStatuses enriches the given instances with the current container status.
 // A failure to reach the deployment backend is logged, but does not fail the request:
 // the instances are returned without status information instead.
-func (this *Controller) addStatuses(instances []model.Instance) {
+func (this *Controller) addStatuses(ctx context.Context, instances []model.Instance) {
 	if len(instances) == 0 {
 		return
 	}
-	statuses, err := this.deploymentClient.GetContainerStatuses()
+	statuses, err := this.deploymentClient.GetContainerStatuses(ctx)
 	if err != nil {
 		if !errors.Is(err, deploy.ErrNotSupported) {
-			log.Logger.Warn("unable to get container statuses", attributes.ErrorKey, err)
+			log.Logger.WarnContext(ctx, "unable to get container statuses", attributes.ErrorKey, err)
 		}
 		return
 	}
@@ -70,8 +74,9 @@ func (this *Controller) addStatuses(instances []model.Instance) {
 	}
 }
 
-func (this *Controller) CountInstances(jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int) {
-	ctx, _ := util.GetTimeoutContext()
+func (this *Controller) CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int) {
+	ctx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
 	count, err = this.db.CountInstances(ctx, jwt, search, includeGenerated)
 	if err != nil {
 		return count, err, http.StatusInternalServerError
@@ -79,19 +84,20 @@ func (this *Controller) CountInstances(jwt jwt.Token, search string, includeGene
 	return count, nil, http.StatusOK
 }
 
-func (this *Controller) ReadInstance(id string, jwt jwt.Token) (result model.Instance, err error, errCode int) {
-	ctx, _ := util.GetTimeoutContext()
-	result, exists, err := this.db.GetInstance(ctx, id, jwt)
+func (this *Controller) ReadInstance(ctx context.Context, id string, jwt jwt.Token) (result model.Instance, err error, errCode int) {
+	dbCtx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
+	result, exists, err := this.db.GetInstance(dbCtx, id, jwt)
 	if !exists {
 		return result, err, http.StatusNotFound
 	}
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}
-	status, err := this.deploymentClient.GetContainerStatus(result.ServiceId, result.Restart)
+	status, err := this.deploymentClient.GetContainerStatus(ctx, result.ServiceId, result.Restart)
 	if err != nil {
 		if !errors.Is(err, deploy.ErrNotSupported) {
-			log.Logger.Warn("unable to get container status", "instance_id", result.Id, attributes.ErrorKey, err)
+			log.Logger.WarnContext(ctx, "unable to get container status", "instance_id", result.Id, attributes.ErrorKey, err)
 		}
 	} else {
 		result.Status = &status
@@ -99,7 +105,8 @@ func (this *Controller) ReadInstance(id string, jwt jwt.Token) (result model.Ins
 	return result, nil, http.StatusOK
 }
 
-func (this *Controller) CreateInstance(instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int) {
+func (this *Controller) CreateInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int) {
+	ctx = util.WriteContext(ctx)
 	if instance.Id != "" {
 		return result, errors.New("explicit setting of id not allowed"), http.StatusBadRequest
 	}
@@ -112,12 +119,21 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt.Token) (
 	}
 	instance.Id = idPrefix + id
 	instance.Owner = jwt.GetUserId()
-	instance, err, code = this.fillDefaultValues(instance, jwt)
+	// The instance's own id joins the baggage here rather than in the middleware,
+	// because it does not exist until now. Whatever the payload carried in its
+	// baggage field is discarded: the context of the caller is what the log lines of
+	// this import should be findable by, not what a caller chose to write down.
+	ctx, err = baggage.WithValue(ctx, baggage.ImportIdKey, instance.Id)
+	if err != nil {
+		log.Logger.DebugContext(ctx, "could not put the instance id into the baggage", attributes.ErrorKey, err)
+	}
+	instance.Baggage = baggage.FromContext(ctx)
+	instance, err, code = this.fillDefaultValues(ctx, instance, jwt)
 	if err != nil || code != http.StatusOK {
 		return result, err, code
 	}
 
-	access, err := this.hasXAccess(jwt, instance.ImportTypeId)
+	access, err := this.hasXAccess(ctx, jwt, instance.ImportTypeId)
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}
@@ -141,7 +157,7 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt.Token) (
 	} else {
 		restart = false
 	}
-	instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId)
+	instance.ServiceId, err = this.deploymentClient.CreateContainer(ctx, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId, instance.Baggage)
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}
@@ -149,17 +165,20 @@ func (this *Controller) CreateInstance(instance model.Instance, jwt jwt.Token) (
 	now := time.Now()
 	instance.CreatedAt = now
 	instance.UpdatedAt = now
-	ctx, _ := util.GetTimeoutContext()
-	err = this.db.CreateInstance(ctx, instance, jwt)
+	dbCtx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
+	err = this.db.CreateInstance(dbCtx, instance, jwt)
 	if err != nil {
 		return result, err, http.StatusInternalServerError
 	}
 	return instance, nil, http.StatusOK
 }
 
-func (this *Controller) SetInstance(instance model.Instance, jwt jwt.Token) (err error, code int) {
-	ctx, _ := util.GetTimeoutContext()
-	existing, exists, err := this.db.GetInstance(ctx, instance.Id, jwt)
+func (this *Controller) SetInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) (err error, code int) {
+	ctx = util.WriteContext(ctx)
+	dbCtx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
+	existing, exists, err := this.db.GetInstance(dbCtx, instance.Id, jwt)
 	if !exists {
 		return errors.New("not found"), http.StatusNotFound
 	}
@@ -169,12 +188,21 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt.Token) (err
 	if existing.ImportTypeId != instance.ImportTypeId {
 		return errors.New("change of import type not supported"), http.StatusBadRequest
 	}
-	instance, err, code = this.fillDefaultValues(instance, jwt)
+	ctx, baggageErr := baggage.WithValue(ctx, baggage.ImportIdKey, instance.Id)
+	if baggageErr != nil {
+		log.Logger.DebugContext(ctx, "could not put the instance id into the baggage", attributes.ErrorKey, baggageErr)
+	}
+	// The stored baggage is the base: every request carries the user of the moment,
+	// so an update by anyone else would otherwise drop the context the instance was
+	// created with -- the smart service instance id above all. The payload's own
+	// baggage field is ignored, as it is on create.
+	instance.Baggage = baggage.Merge(existing.Baggage, baggage.FromContext(ctx))
+	instance, err, code = this.fillDefaultValues(ctx, instance, jwt)
 	if err != nil || code != http.StatusOK {
 		return err, code
 	}
 
-	access, err := this.hasXAccess(jwt, instance.ImportTypeId)
+	access, err := this.hasXAccess(ctx, jwt, instance.ImportTypeId)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
@@ -200,29 +228,33 @@ func (this *Controller) SetInstance(instance model.Instance, jwt jwt.Token) (err
 		existingRestart = false
 	}
 
-	instance.ServiceId, err = this.deploymentClient.UpdateContainer(existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId, existingRestart)
+	instance.ServiceId, err = this.deploymentClient.UpdateContainer(ctx, existing.ServiceId, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId, existingRestart, instance.Baggage)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
 	instance.UpdatedAt = time.Now()
-	ctx, _ = util.GetTimeoutContext()
-	err = this.db.SetInstance(ctx, instance, jwt)
+	dbCtx, cf2 := util.GetTimeoutContext(ctx)
+	defer cf2()
+	err = this.db.SetInstance(dbCtx, instance, jwt)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
 	return nil, http.StatusOK
 }
 
-func (this *Controller) DeleteInstance(id string, jwt jwt.Token) (err error, errCode int) {
-	ctx, _ := util.GetTimeoutContext()
-	instance, exists, err := this.db.GetInstance(ctx, id, jwt)
+func (this *Controller) DeleteInstance(ctx context.Context, id string, jwt jwt.Token) (err error, errCode int) {
+	ctx = util.WriteContext(ctx)
+	dbCtx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
+	instance, exists, err := this.db.GetInstance(dbCtx, id, jwt)
 	if !exists {
 		return errors.New("not found"), http.StatusNotFound
 	}
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
-	err = this.deploymentClient.RemoveContainer(instance.ServiceId)
+	ctx = baggage.WithStored(ctx, instance.Baggage)
+	err = this.deploymentClient.RemoveContainer(ctx, instance.ServiceId)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
@@ -234,19 +266,25 @@ func (this *Controller) DeleteInstance(id string, jwt jwt.Token) (err error, err
 		}
 	}
 
-	err = this.db.RemoveInstance(ctx, id, jwt)
+	// A fresh timeout: the container and the topic are gone by now, and the ten
+	// seconds the lookup above started with may well be up.
+	removeCtx, cf2 := util.GetTimeoutContext(ctx)
+	defer cf2()
+	err = this.db.RemoveInstance(removeCtx, id, jwt)
 	if err != nil {
 		return err, http.StatusInternalServerError
 	}
 	return nil, http.StatusNoContent
 }
 
-func (this *Controller) EnsureAllInstancesDeployed() (err error) {
+func (this *Controller) EnsureAllInstancesDeployed(ctx context.Context) (err error) {
+	ctx = util.WriteContext(ctx)
 	var offset int64 = 0
 	var batchSize int64 = 100
 	for {
-		ctx, _ := util.GetTimeoutContext()
-		instances, err := this.db.ListInstances(ctx, batchSize, offset, "name", jwt.Token{Token: permV2Client.InternalAdminToken}, true, "", true, []string{})
+		dbCtx, cf := util.GetTimeoutContext(ctx)
+		instances, err := this.db.ListInstances(dbCtx, batchSize, offset, "name", jwt.Token{Token: permV2Client.InternalAdminToken}, true, "", true, []string{})
+		cf()
 		if err != nil {
 			return err
 		}
@@ -255,15 +293,19 @@ func (this *Controller) EnsureAllInstancesDeployed() (err error) {
 		}
 		offset += int64(len(instances))
 		for _, instance := range instances {
-			exists, err := this.deploymentClient.ContainerExists(instance.ServiceId, instance.Restart)
+			// No request to read a context off here, so the one the instance was created
+			// with is put back: the lines below are about that import and should be
+			// findable the same way its own are.
+			instanceCtx := baggage.WithStored(ctx, instance.Baggage)
+			exists, err := this.deploymentClient.ContainerExists(instanceCtx, instance.ServiceId, instance.Restart)
 			if err != nil {
 				return err
 			}
 			if exists {
-				log.Logger.Debug("instance still exists", "instance_id", instance.Id)
+				log.Logger.DebugContext(instanceCtx, "instance still exists", "instance_id", instance.Id)
 				continue
 			}
-			log.Logger.Info("recreating instance", "instance_id", instance.Id)
+			log.Logger.InfoContext(instanceCtx, "recreating instance", "instance_id", instance.Id)
 			env, err := this.getEnv(instance)
 			if err != nil {
 				return err
@@ -274,12 +316,13 @@ func (this *Controller) EnsureAllInstancesDeployed() (err error) {
 			} else {
 				restart = false
 			}
-			instance.ServiceId, err = this.deploymentClient.CreateContainer(containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId)
+			instance.ServiceId, err = this.deploymentClient.CreateContainer(instanceCtx, containerNamePrefix+strings.TrimPrefix(instance.Id, idPrefix), instance.Image, env, restart, instance.Owner, instance.ImportTypeId, instance.Baggage)
 			if err != nil {
 				return err
 			}
-			ctx, _ := util.GetTimeoutContext()
-			err = this.db.SetInstance(ctx, instance, jwt.Token{Token: permV2Client.InternalAdminToken})
+			setCtx, cf := util.GetTimeoutContext(instanceCtx)
+			err = this.db.SetInstance(setCtx, instance, jwt.Token{Token: permV2Client.InternalAdminToken})
+			cf()
 			if err != nil {
 				return err
 			}
@@ -287,8 +330,8 @@ func (this *Controller) EnsureAllInstancesDeployed() (err error) {
 	}
 }
 
-func (this *Controller) fillDefaultValues(instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int) {
-	importType, err, code := this.getImportType(instance.ImportTypeId, jwt)
+func (this *Controller) fillDefaultValues(ctx context.Context, instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int) {
+	importType, err, code := this.getImportType(ctx, instance.ImportTypeId, jwt)
 	if err != nil {
 		return instance, err, code
 	}
@@ -317,14 +360,24 @@ func (this *Controller) fillDefaultValues(instance model.Instance, jwt jwt.Token
 	return instance, nil, http.StatusOK
 }
 
-func (this *Controller) getImportType(id string, jwt jwt.Token) (importType model.ImportType, err error, code int) {
-	req, err := http.NewRequest("GET", this.config.ImportRepoUrl+"/import-types/"+id, nil)
+func (this *Controller) getImportType(ctx context.Context, id string, jwt jwt.Token) (importType model.ImportType, err error, code int) {
+	ctx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, this.config.ImportRepoUrl+"/import-types/"+id, nil)
+	if err != nil {
+		return importType, err, http.StatusInternalServerError
+	}
 	req.Header.Set("Authorization", jwt.Token)
+	// The trace and the baggage of the caller, so the import repo continues the same
+	// trace instead of starting one of its own.
+	if err = otelx.InjectContextToRequest(ctx, req); err != nil {
+		log.Logger.DebugContext(ctx, "could not inject the trace context", attributes.ErrorKey, err)
+	}
 	resp, err := http.DefaultClient.Do(req)
-
 	if err != nil {
 		return importType, errors.New("unable to contact import repo"), http.StatusBadGateway
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
 		return importType, errors.New("unknown import type"), resp.StatusCode
 	}
@@ -392,10 +445,16 @@ func (this *Controller) getEnv(instance model.Instance) (m map[string]string, er
 	m["KAFKA_TOPIC"] = instance.KafkaTopic
 	m["KAFKA_BOOTSTRAP"] = this.config.KafkaBootstrap
 	m["IMPORT_ID"] = instance.Id
+	// Read by import-lib, which puts the entries into every log record the import
+	// writes. The pod labels the drivers set cover the same ground for the log
+	// aggregation, which only sees the container from the outside.
+	if header := baggage.Header(instance.Baggage); header != "" {
+		m[baggage.EnvVar] = header
+	}
 	return m, nil
 }
 
-func (this *Controller) hasXAccess(jwt jwt.Token, importTypeId string) (bool, error) {
-	access, err, _ := this.permv2.CheckPermission(jwt.Token, "import-types", importTypeId, 'x')
+func (this *Controller) hasXAccess(ctx context.Context, jwt jwt.Token, importTypeId string) (bool, error) {
+	access, err, _ := this.permv2.CheckPermissionContext(ctx, jwt.Token, "import-types", importTypeId, 'x')
 	return access, err
 }

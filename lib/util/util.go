@@ -21,6 +21,20 @@ import (
 	"time"
 )
 
-func GetTimeoutContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 10*time.Second)
+// GetTimeoutContext returns a context for a single call to a backend. It keeps the
+// values of ctx -- the trace and the baggage of the request that caused the call --
+// and puts the usual timeout on it.
+func GetTimeoutContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, 10*time.Second)
+}
+
+// WriteContext keeps the values of ctx but drops its cancellation.
+//
+// Creating, updating and deleting an instance each write to the deployment backend
+// and to the database, and the two have to agree. A request cancelled between the
+// two writes would leave a container running that no instance points at, or an
+// instance whose container is gone -- which the startup restore then recreates. The
+// read paths stay cancellable.
+func WriteContext(ctx context.Context) context.Context {
+	return context.WithoutCancel(ctx)
 }

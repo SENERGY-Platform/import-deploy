@@ -17,6 +17,7 @@
 package deploy
 
 import (
+	"context"
 	"errors"
 
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
@@ -25,14 +26,17 @@ import (
 // ErrNotSupported is returned by deployment clients that cannot provide the requested information.
 var ErrNotSupported = errors.New("operation not supported by deployment client")
 
+// A baggage parameter is the OpenTelemetry context of the instance, which the
+// drivers turn into labels on the workload. The container itself receives the same
+// context as an environment variable, which the controller puts into env.
 type DeploymentClient interface {
-	CreateContainer(name string, image string, env map[string]string, restart bool, userid string, importTypeId string) (id string, err error)
-	UpdateContainer(id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, existingRestart bool) (newId string, err error)
-	RemoveContainer(id string) (err error)
-	ContainerExists(id string, restart *bool) (exists bool, err error)
+	CreateContainer(ctx context.Context, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, baggage map[string]string) (id string, err error)
+	UpdateContainer(ctx context.Context, id string, name string, image string, env map[string]string, restart bool, userid string, importTypeId string, existingRestart bool, baggage map[string]string) (newId string, err error)
+	RemoveContainer(ctx context.Context, id string) (err error)
+	ContainerExists(ctx context.Context, id string, restart *bool) (exists bool, err error)
 	// GetContainerStatus returns the current status of a single container.
-	GetContainerStatus(id string, restart *bool) (status model.InstanceStatus, err error)
+	GetContainerStatus(ctx context.Context, id string, restart *bool) (status model.InstanceStatus, err error)
 	// GetContainerStatuses returns the status of all known containers, keyed by container id.
-	GetContainerStatuses() (statuses map[string]model.InstanceStatus, err error)
+	GetContainerStatuses(ctx context.Context) (statuses map[string]model.InstanceStatus, err error)
 	Disconnect() (err error)
 }
