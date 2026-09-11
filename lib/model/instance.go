@@ -21,6 +21,11 @@ import permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
 
 type Instances []Instance
 
+// Instance is an import instance. Its api representation is the shared models.Import,
+// widened by what this service keeps about a deployment. It is not aliased onto that
+// type: the extra fields would have to be embedded, and an embedded type is no longer
+// addressable by a field literal, which is how callers of this service's client build
+// an instance.
 type Instance struct {
 	Id           string           `json:"id"`
 	Name         string           `json:"name"`

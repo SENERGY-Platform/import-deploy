@@ -16,31 +16,37 @@
 
 package model
 
-type ImportType struct {
-	Id             string             `json:"id"`
-	Name           string             `json:"name"`
-	Description    string             `json:"description"`
-	Image          string             `json:"image"`
-	DefaultRestart bool               `json:"default_restart"`
-	Configs        []ImportTypeConfig `json:"configs"`
-	Owner          string             `json:"owner"`
-}
+import "github.com/SENERGY-Platform/models/go/models"
 
-type ImportTypeConfig struct {
-	Name         string      `json:"name"`
-	Description  string      `json:"description"`
-	Type         Type        `json:"type"`
-	DefaultValue interface{} `json:"default_value"`
-}
+// An import type belongs to the import repository; its types live in the shared model,
+// which is where the import repository defines them too. They are aliased rather than
+// imported directly, because the controller of this service is compiled against these
+// names.
+//
+// The shared type also carries the fields this service does not read itself -- the
+// output description with its aspects and functions, and the cost -- which the local
+// copy used to drop on decode.
 
-type Type string
+type ImportType = models.ImportType
+
+// ImportTypeConfig declares a config of an import type. It is the counterpart of
+// InstanceConfig, which holds the value an instance actually runs with.
+type ImportTypeConfig = models.ImportTypeConfig
+
+// ContentVariable describes the output of an import type. It carries AspectIds; the
+// deprecated AspectId is an alias for a single entry of that list. Both are filled by
+// the import repository on read, so a reader here has to interpret only one of them and
+// needs no folding of its own.
+type ContentVariable = models.ImportContentVariable
+
+type Type = models.Type
 
 const (
-	String  Type = "https://schema.org/Text"
-	Integer Type = "https://schema.org/Integer"
-	Float   Type = "https://schema.org/Float"
-	Boolean Type = "https://schema.org/Boolean"
+	String  = models.String
+	Integer = models.Integer
+	Float   = models.Float
+	Boolean = models.Boolean
 
-	List      Type = "https://schema.org/ItemList"
-	Structure Type = "https://schema.org/StructuredValue"
+	List      = models.List
+	Structure = models.Structure
 )
