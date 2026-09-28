@@ -19,6 +19,7 @@ package mongo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -43,13 +44,36 @@ type Mongo struct {
 
 var CreateCollections = []func(db *Mongo) error{}
 
+var (
+	ErrEmptyDatabase   = errors.New("mongo database name must not be empty")
+	ErrMissingPassword = errors.New("mongo password must not be empty when a mongo user is set")
+)
+
+const startupCheckTimeout = 10 * time.Second
+
 func New(perm permV2Client.Client, conf config.Config, ctx context.Context, wg *sync.WaitGroup) (*Mongo, error) {
+	if err := validateConfig(conf); err != nil {
+		return nil, err
+	}
 	// The monitor gives every query a span under the trace of the request that
 	// caused it, so a slow read shows up next to the handler that waited for it. It
 	// needs an initialized OpenTelemetry, which lib.Start does before calling here.
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(conf.MongoUrl).SetMonitor(otelmongo.NewMonitor()))
+	return start(ctx, wg, perm, conf, clientOptions(conf).SetMonitor(otelmongo.NewMonitor()), startupCheckTimeout)
+}
+
+// start disconnects the client on every failure path, so a failed startup leaves nothing connected.
+func start(ctx context.Context, wg *sync.WaitGroup, perm permV2Client.Client, conf config.Config, opts *options.ClientOptions, timeout time.Duration) (*Mongo, error) {
+	client, err := connect(ctx, opts, conf.MongoDatabase, timeout)
 	if err != nil {
 		return nil, err
+	}
+	db := &Mongo{config: conf, client: client, perm: perm}
+	for _, creators := range CreateCollections {
+		err = creators(db)
+		if err != nil {
+			db.Disconnect()
+			return nil, err
+		}
 	}
 	wg.Add(1)
 	go func() {
@@ -57,15 +81,49 @@ func New(perm permV2Client.Client, conf config.Config, ctx context.Context, wg *
 		_ = client.Disconnect(context.Background())
 		wg.Done()
 	}()
-	db := &Mongo{config: conf, client: client, perm: perm}
-	for _, creators := range CreateCollections {
-		err = creators(db)
-		if err != nil {
-			_ = client.Disconnect(context.Background())
-			return nil, err
-		}
-	}
 	return db, nil
+}
+
+// connect runs listCollections on the service database because Connect is lazy and ping needs no
+// authentication; unreachable servers and wrong or missing credentials then fail at startup.
+func connect(ctx context.Context, opts *options.ClientOptions, database string, timeout time.Duration) (*mongo.Client, error) {
+	client, err := mongo.Connect(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	listOpts := options.ListCollections().SetNameOnly(true).SetAuthorizedCollections(true)
+	if _, err = client.Database(database).ListCollectionNames(checkCtx, bson.D{}, listOpts); err != nil {
+		disconnectCtx, disconnectCancel := context.WithTimeout(context.Background(), timeout)
+		defer disconnectCancel()
+		_ = client.Disconnect(disconnectCtx)
+		return nil, fmt.Errorf("mongo startup check failed: %w", err)
+	}
+	return client, nil
+}
+
+func validateConfig(conf config.Config) error {
+	if conf.MongoDatabase == "" {
+		return ErrEmptyDatabase
+	}
+	if conf.MongoUser != "" && conf.MongoPassword == "" {
+		return ErrMissingPassword
+	}
+	return nil
+}
+
+// clientOptions applies the credentials after the URI so they replace any given in MONGO_URL.
+func clientOptions(conf config.Config) *options.ClientOptions {
+	opts := options.Client().ApplyURI(conf.MongoUrl)
+	if conf.MongoUser != "" {
+		opts.SetAuth(options.Credential{
+			Username:   conf.MongoUser,
+			Password:   conf.MongoPassword,
+			AuthSource: conf.MongoAuthSource,
+		})
+	}
+	return opts
 }
 
 func (this *Mongo) CreateId() string {
@@ -137,7 +195,9 @@ func (this *Mongo) ensureCompoundIndex(collection *mongo.Collection, indexname s
 }
 
 func (this *Mongo) Disconnect() {
-	err := this.client.Disconnect(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err := this.client.Disconnect(ctx)
 	if err != nil {
 		log.Logger.Error("unable to disconnect mongo client", attributes.ErrorKey, err)
 	}

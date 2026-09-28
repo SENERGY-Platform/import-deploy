@@ -14,8 +14,11 @@ import-deploy can manage containers in three different backends:
 Simply set these environment variables (default values in brackets):
 * SERVER_PORT: port to listen on (8080)
 * JWT_PUB_RSA: public RSA Key to validate JWTs ("")
-* MONGO_URL: URL of the mongo db (mongodb://localhost:27017)
-* MONGO_TABLE: mongo db table to use (importdeploy)
+* MONGO_URL: full connection string of the mongo db, no credentials inside (mongodb://localhost:27017)
+* MONGO_USER: mongo user name, empty means no authentication ("")
+* MONGO_PASSWORD: mongo user password, required when MONGO_USER is set ("")
+* MONGO_AUTH_SOURCE: database MONGO_USER is defined in (admin)
+* MONGO_DATABASE: mongo database to use (import_deploy)
 * MONGO_IMPORT_TYPE_COLLECTION: mongo collection to use (instances)
 * MONGO_REPL_SET: whether the mongo db is running as replication set (true)
 * IMPORT_REPO_URL: URL of the [import-repository](https://github.com/SENERGY-Platform/import-repository) (http://localhost:8181)
@@ -142,4 +145,14 @@ and [permission-search](https://github.com/SENERGY-Platform/permission-search)
 ## Interactions with [import-repository](https://github.com/SENERGY-Platform/import-repository)
 When creating or updating an instance, the referenced import_type will be read from the [import-repository](https://github.com/SENERGY-Platform/import-repository).
 This ensures read access to the import_type and provides default values for image, restart and configs.
+
+## Tests
+
+    go test ./...
+
+`TestStartAuthenticates` runs only without `-short` and when `MONGO_AUTH_TEST_URL`, `MONGO_AUTH_TEST_USER` and `MONGO_AUTH_TEST_PASSWORD` are set. The user and password are root credentials of a throwaway server with access control; the test creates and removes its own users and databases there. Example:
+
+    docker run -d --rm --name import-deploy-auth-test -p 127.0.0.1:27018:27017 -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=rootpw mongo:8.0
+    MONGO_AUTH_TEST_URL=mongodb://127.0.0.1:27018 MONGO_AUTH_TEST_USER=root MONGO_AUTH_TEST_PASSWORD=rootpw go test ./lib/database/mongo/
+    docker stop import-deploy-auth-test
 
