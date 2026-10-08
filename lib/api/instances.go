@@ -217,7 +217,9 @@ func setInstanceHandler(control Controller) gin.HandlerFunc {
 		}
 		id := c.Param("id")
 		instance := model.Instance{}
-		err = c.ShouldBind(&instance)
+		// JSON whatever the Content-Type says: ShouldBind falls back to form binding
+		// without one, which leaves every field empty and reports no error.
+		err = c.ShouldBindJSON(&instance)
 		if err != nil {
 			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
@@ -257,7 +259,9 @@ func createInstanceHandler(control Controller) gin.HandlerFunc {
 			return
 		}
 		instance := model.Instance{}
-		err = c.ShouldBind(&instance)
+		// JSON whatever the Content-Type says: ShouldBind falls back to form binding
+		// without one, which leaves every field empty and reports no error.
+		err = c.ShouldBindJSON(&instance)
 		if err != nil {
 			_ = c.Error(errors.Join(model.ErrBadRequest, err))
 			return
