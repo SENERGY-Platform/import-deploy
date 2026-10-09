@@ -32,4 +32,5 @@ type Controller interface {
 	SetInstance(ctx context.Context, importType model.Instance, jwt jwt.Token) (err error, code int)
 	DeleteInstance(ctx context.Context, id string, jwt jwt.Token) (err error, errCode int)
 	CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int)
+	ImportTypeUsage(ctx context.Context, jwt jwt.Token, importTypeId string) (usage model.ImportTypeUsage, err error, errCode int)
 }

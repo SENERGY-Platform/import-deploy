@@ -26,10 +26,14 @@ var ErrBadRequest = errors.New("bad request")
 var ErrInternalServerError = errors.New("internal server error")
 var ErrForbidden = fmt.Errorf("forbidden")
 var ErrNotFound = fmt.Errorf("not found")
+var ErrUnauthorized = errors.New("unauthorized")
 
 func GetStatusCode(err error) int {
 	if err == nil {
 		return http.StatusOK
+	}
+	if errors.Is(err, ErrUnauthorized) {
+		return http.StatusUnauthorized
 	}
 	if errors.Is(err, ErrBadRequest) {
 		return http.StatusBadRequest

@@ -136,6 +136,15 @@ Body: Full ImportType. Ensure id in url and ImportType match. Changing owner or 
 DELETE /instances/:id
 ```
 
+### Import type usage
+```
+GET /import-type-usage/:id
+Returns {"instances": n, "readable": [{"id", "name"}]}
+```
+`instances` counts the instances of all users with that `import_type_id`; `readable` lists only those the caller may read.
+Any authenticated caller may ask, a missing or unparseable token is answered with 401.
+The [import-repository](https://github.com/SENERGY-Platform/import-repository) asks this, with the caller's token, before it deletes an import type.
+
 ## Security
 Identity is provided by populating the Header "Authorization" with a JWT (prefixed by "Bearer ").
 The token can be validated by providing a public RSA key as config.
@@ -155,4 +164,10 @@ This ensures read access to the import_type and provides default values for imag
     docker run -d --rm --name import-deploy-auth-test -p 127.0.0.1:27018:27017 -e MONGO_INITDB_ROOT_USERNAME=root -e MONGO_INITDB_ROOT_PASSWORD=rootpw mongo:8.0
     MONGO_AUTH_TEST_URL=mongodb://127.0.0.1:27018 MONGO_AUTH_TEST_USER=root MONGO_AUTH_TEST_PASSWORD=rootpw go test ./lib/database/mongo/
     docker stop import-deploy-auth-test
+
+`TestImportTypeUsage` runs only without `-short` and when `MONGO_TEST_URL` points at a throwaway MongoDB without access control; it creates and drops its own database. Example:
+
+    docker run -d --rm --name import-deploy-usage-test -p 127.0.0.1:27019:27017 mongo:8.0
+    MONGO_TEST_URL=mongodb://127.0.0.1:27019 go test ./lib/database/mongo/
+    docker stop import-deploy-usage-test
 

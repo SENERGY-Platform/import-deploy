@@ -34,6 +34,7 @@ type Database interface {
 	SetInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) error
 	RemoveInstance(ctx context.Context, id string, jwt jwt.Token) error
 	CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (count int64, err error)
+	ImportTypeUsage(ctx context.Context, jwt jwt.Token, importTypeId string) (usage model.ImportTypeUsage, err error)
 }
 
 type KafkaAdmin interface {

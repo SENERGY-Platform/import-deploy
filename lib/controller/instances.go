@@ -84,6 +84,16 @@ func (this *Controller) CountInstances(ctx context.Context, jwt jwt.Token, searc
 	return count, nil, http.StatusOK
 }
 
+func (this *Controller) ImportTypeUsage(ctx context.Context, jwt jwt.Token, importTypeId string) (usage model.ImportTypeUsage, err error, errCode int) {
+	ctx, cf := util.GetTimeoutContext(ctx)
+	defer cf()
+	usage, err = this.db.ImportTypeUsage(ctx, jwt, importTypeId)
+	if err != nil {
+		return usage, err, http.StatusInternalServerError
+	}
+	return usage, nil, http.StatusOK
+}
+
 func (this *Controller) ReadInstance(ctx context.Context, id string, jwt jwt.Token) (result model.Instance, err error, errCode int) {
 	dbCtx, cf := util.GetTimeoutContext(ctx)
 	defer cf()

@@ -43,6 +43,7 @@ const createdAtFieldName = "CreatedAt"
 const updatedAtFieldName = "UpdatedAt"
 const generatedFieldName = "Generated"
 const imageFieldName = "Image"
+const importTypeIdFieldName = "ImportTypeId"
 
 var idKey string
 var nameKey string
@@ -51,6 +52,7 @@ var createdAtKey string
 var updatedAtKey string
 var generatedKey string
 var imageKey string
+var importTypeIdKey string
 
 func init() {
 	var err error
@@ -89,6 +91,11 @@ func init() {
 		log.Logger.Error("unable to resolve bson field name", "field", imageFieldName, attributes.ErrorKey, err)
 		panic(err)
 	}
+	importTypeIdKey, err = getBsonFieldName(model.Instance{}, importTypeIdFieldName)
+	if err != nil {
+		log.Logger.Error("unable to resolve bson field name", "field", importTypeIdFieldName, attributes.ErrorKey, err)
+		panic(err)
+	}
 
 	CreateCollections = append(CreateCollections, func(db *Mongo) error {
 		collection := db.client.Database(db.config.MongoDatabase).Collection(db.config.MongoImportTypeCollection)
@@ -97,6 +104,10 @@ func init() {
 			return err
 		}
 		err = db.ensureCompoundIndex(collection, "instanceOwnerIdindex", true, true, ownerKey, idKey)
+		if err != nil {
+			return err
+		}
+		err = db.ensureIndex(collection, "instanceImportTypeIdindex", importTypeIdKey, true, false)
 		if err != nil {
 			return err
 		}
@@ -323,6 +334,36 @@ func (this *Mongo) CountInstances(ctx context.Context, jwt jwt.Token, search str
 	}
 	count, err := this.instanceCollection().CountDocuments(ctx, filter)
 	return count, err
+}
+
+// ImportTypeUsage counts the instances of an import type over all users. The list is cut down to
+// the instances the caller may read, by the same permission check ListInstances uses.
+func (this *Mongo) ImportTypeUsage(ctx context.Context, jwt jwt.Token, importTypeId string) (usage model.ImportTypeUsage, err error) {
+	usage.Readable = []model.InstanceRef{}
+	filter := bson.M{importTypeIdKey: importTypeId}
+	usage.Instances, err = this.instanceCollection().CountDocuments(ctx, filter)
+	if err != nil || usage.Instances == 0 {
+		return usage, err
+	}
+	ids, err, _ := this.perm.ListAccessibleResourceIdsContext(ctx, jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
+	if err != nil || len(ids) == 0 {
+		return usage, err
+	}
+	filter[idKey] = bson.M{"$in": ids}
+	opt := options.Find().SetSort(bson.D{{Key: nameKey, Value: 1}, {Key: idKey, Value: 1}}).SetProjection(bson.M{idKey: 1, nameKey: 1})
+	cursor, err := this.instanceCollection().Find(ctx, filter, opt)
+	if err != nil {
+		return usage, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+	for cursor.Next(ctx) {
+		instance := model.Instance{}
+		if err = cursor.Decode(&instance); err != nil {
+			return usage, err
+		}
+		usage.Readable = append(usage.Readable, model.InstanceRef{Id: instance.Id, Name: instance.Name})
+	}
+	return usage, cursor.Err()
 }
 
 func configToWrite(config *model.InstanceConfig) error {

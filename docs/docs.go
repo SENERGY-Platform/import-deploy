@@ -55,6 +55,47 @@ const docTemplate = `{
                 }
             }
         },
+        "/import-type-usage/{id}": {
+            "get": {
+                "description": "Returns how many import instances of all users use the import type, and which of them the caller may read. The import repository asks this before it deletes an import type.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "instances"
+                ],
+                "summary": "Get import type usage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Import type id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.ImportTypeUsage"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/instances": {
             "get": {
                 "description": "Returns import instances visible to the caller, including the current container status.",
@@ -406,6 +447,20 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "model.ImportTypeUsage": {
+            "type": "object",
+            "properties": {
+                "instances": {
+                    "type": "integer"
+                },
+                "readable": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.InstanceRef"
+                    }
+                }
+            }
+        },
         "model.Instance": {
             "type": "object",
             "properties": {
@@ -466,6 +521,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "value": {}
+            }
+        },
+        "model.InstanceRef": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
             }
         },
         "model.InstanceStatus": {
