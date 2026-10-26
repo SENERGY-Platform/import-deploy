@@ -128,7 +128,7 @@ Query parameters:
 ### Update
 ```
 PUT /instances/:id
-Body: Full ImportType. Ensure id in url and ImportType match. Changing owner or kafka_topic is not allowed.
+Body: Full ImportType. Ensure id in url and ImportType match. Changing owner or kafka_topic is not allowed. created_at is kept from the stored instance, a value in the body is ignored.
 ```
 
 ### Delete

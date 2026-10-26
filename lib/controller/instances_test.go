@@ -102,6 +102,37 @@ func TestSetInstanceKeepsTheOwner(t *testing.T) {
 	}
 }
 
+// The creation time is part of the body a client reads and sends back, but it is the
+// server's: a body that leaves it out must not zero it, and one that carries another
+// value must not rewrite it.
+func TestSetInstanceKeepsTheCreationTime(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		createdAt time.Time
+	}{
+		{name: "a body without a creation time"},
+		{name: "a body with another creation time", createdAt: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			stored := storedInstance()
+			control, db, _ := updateController(t, stored)
+			update := sentBack(t, stored)
+			update.CreatedAt = test.createdAt
+
+			err, code := control.SetInstance(context.Background(), update, jwt.Token{Token: "Bearer token"})
+			if err != nil || code != http.StatusOK {
+				t.Fatalf("expected the update to pass, got %v (%v)", err, code)
+			}
+			if db.written == nil {
+				t.Fatal("expected the instance to be written")
+			}
+			if !db.written.CreatedAt.Equal(stored.CreatedAt) {
+				t.Errorf("expected the creation time %v, got %v", stored.CreatedAt, db.written.CreatedAt)
+			}
+		})
+	}
+}
+
 // storedInstance is a deployed instance as the database holds it.
 func storedInstance() model.Instance {
 	restart := true

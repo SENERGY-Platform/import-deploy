@@ -197,7 +197,7 @@ func deleteInstanceHandler(control Controller) gin.HandlerFunc {
 
 // setInstanceHandler godoc
 // @Summary Update instance
-// @Description Replaces an instance. The request body id must match the path id.
+// @Description Replaces an instance. The request body id must match the path id. created_at is kept from the stored instance, a value in the body is ignored.
 // @Tags instances
 // @Accept json
 // @Param id path string true "Instance id"

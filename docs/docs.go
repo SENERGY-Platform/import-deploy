@@ -291,7 +291,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Replaces an instance. The request body id must match the path id.",
+                "description": "Replaces an instance. The request body id must match the path id. created_at is kept from the stored instance, a value in the body is ignored.",
                 "consumes": [
                     "application/json"
                 ],
