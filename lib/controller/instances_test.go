@@ -17,11 +17,18 @@
 package controller
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/SENERGY-Platform/import-deploy/lib/baggage"
 	"github.com/SENERGY-Platform/import-deploy/lib/config"
+	"github.com/SENERGY-Platform/import-deploy/lib/deploy"
 	"github.com/SENERGY-Platform/import-deploy/lib/model"
+	permV2Client "github.com/SENERGY-Platform/permissions-v2/pkg/client"
+	"github.com/SENERGY-Platform/service-commons/pkg/jwt"
 )
 
 // The environment variable is the complete context an import gets: the pod labels
@@ -63,4 +70,114 @@ func TestGetEnvWithoutBaggage(t *testing.T) {
 	if _, exists := env[baggage.EnvVar]; exists {
 		t.Errorf("expected no %s, got %q", baggage.EnvVar, env[baggage.EnvVar])
 	}
+}
+
+// The owner is never part of a request body, so an update has to take it from the
+// stored instance. Without it the deployment was written with an empty user label,
+// which is part of its immutable selector, and Kubernetes refused the update; a
+// container that had to be recreated instead lost its owner in the database as well.
+func TestSetInstanceKeepsTheOwner(t *testing.T) {
+	stored := storedInstance()
+	control, db, deployment := updateController(t, stored)
+
+	// What the web UI sends: the instance as it read it, edited and sent back.
+	update := sentBack(t, stored)
+	update.Name = "weather, renamed"
+
+	err, code := control.SetInstance(context.Background(), update, jwt.Token{Token: "Bearer token"})
+	if err != nil || code != http.StatusOK {
+		t.Fatalf("expected the update to pass, got %v (%v)", err, code)
+	}
+	if deployment.userid != stored.Owner {
+		t.Errorf("expected the deployment to keep the user %q, got %q", stored.Owner, deployment.userid)
+	}
+	if db.written == nil {
+		t.Fatal("expected the instance to be written")
+	}
+	if db.written.Owner != stored.Owner {
+		t.Errorf("expected the document to keep the owner %q, got %q", stored.Owner, db.written.Owner)
+	}
+	if db.written.Name != update.Name {
+		t.Errorf("expected the update to be written, got the name %q", db.written.Name)
+	}
+}
+
+// storedInstance is a deployed instance as the database holds it.
+func storedInstance() model.Instance {
+	restart := true
+	return model.Instance{
+		Id:           "urn:infai:ses:import:3c1f9b42",
+		Name:         "weather",
+		ImportTypeId: "urn:infai:ses:import-type:8f2c0a51",
+		Restart:      &restart,
+		ServiceId:    "import-3c1f9b42",
+		Owner:        "9a4c2e17",
+		CreatedAt:    time.Date(2026, 3, 12, 9, 41, 0, 0, time.UTC),
+		UpdatedAt:    time.Date(2026, 3, 12, 9, 41, 0, 0, time.UTC),
+	}
+}
+
+// sentBack is an instance after a round trip through its api representation, the
+// way a client reads it and sends it back.
+func sentBack(t *testing.T, instance model.Instance) model.Instance {
+	t.Helper()
+	body, err := json.Marshal(instance)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result model.Instance
+	if err = json.Unmarshal(body, &result); err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+// updateController returns a controller that finds the given instance, may execute
+// every import type and records what it deploys and writes.
+func updateController(t *testing.T, stored model.Instance) (*Controller, *instanceStore, *recordingDeployment) {
+	t.Helper()
+	db := &instanceStore{stored: stored}
+	deployment := &recordingDeployment{}
+	control := importTypeController(t, func(writer http.ResponseWriter, request *http.Request) {
+		_, _ = writer.Write([]byte(importTypeResponse))
+	})
+	control.db = db
+	control.deploymentClient = deployment
+	control.permv2 = grantAll{}
+	return control, db, deployment
+}
+
+// instanceStore holds a single instance and records what is written back.
+type instanceStore struct {
+	Database
+	stored  model.Instance
+	written *model.Instance
+}
+
+func (this *instanceStore) GetInstance(_ context.Context, _ string, _ jwt.Token) (model.Instance, bool, error) {
+	return this.stored, true, nil
+}
+
+func (this *instanceStore) SetInstance(_ context.Context, instance model.Instance, _ jwt.Token) error {
+	this.written = &instance
+	return nil
+}
+
+// recordingDeployment records the user a deployment is updated with.
+type recordingDeployment struct {
+	deploy.DeploymentClient
+	userid string
+}
+
+func (this *recordingDeployment) UpdateContainer(_ context.Context, _ string, name string, _ string, _ map[string]string, _ bool, userid string, _ string, _ bool, _ map[string]string) (string, error) {
+	this.userid = userid
+	return name, nil
+}
+
+type grantAll struct {
+	permV2Client.Client
+}
+
+func (grantAll) CheckPermissionContext(_ context.Context, _ string, _ string, _ string, _ ...permV2Client.Permission) (bool, error, int) {
+	return true, nil, http.StatusOK
 }

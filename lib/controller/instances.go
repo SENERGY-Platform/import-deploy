@@ -198,6 +198,10 @@ func (this *Controller) SetInstance(ctx context.Context, instance model.Instance
 	if existing.ImportTypeId != instance.ImportTypeId {
 		return errors.New("change of import type not supported"), http.StatusBadRequest
 	}
+	// The owner is never read from a request body. It labels the deployment, as part of
+	// a selector Kubernetes does not let change, and the document is replaced as a
+	// whole, so it has to come from the stored instance.
+	instance.Owner = existing.Owner
 	ctx, baggageErr := baggage.WithValue(ctx, baggage.ImportIdKey, instance.Id)
 	if baggageErr != nil {
 		log.Logger.DebugContext(ctx, "could not put the instance id into the baggage", attributes.ErrorKey, baggageErr)
