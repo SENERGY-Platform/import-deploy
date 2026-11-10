@@ -26,11 +26,11 @@ import (
 // The ctx of every method is the one of the incoming request: it carries the trace
 // and the baggage the OpenTelemetry middleware put on it.
 type Controller interface {
-	ListInstances(ctx context.Context, jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string) (results []model.Instance, err error, errCode int)
+	ListInstances(ctx context.Context, jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string, importTypeId string) (results []model.Instance, err error, errCode int)
 	ReadInstance(ctx context.Context, id string, jwt jwt.Token) (result model.Instance, err error, errCode int)
 	CreateInstance(ctx context.Context, instance model.Instance, jwt jwt.Token) (result model.Instance, err error, code int)
 	SetInstance(ctx context.Context, importType model.Instance, jwt jwt.Token) (err error, code int)
 	DeleteInstance(ctx context.Context, id string, jwt jwt.Token) (err error, errCode int)
-	CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int)
+	CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool, importTypeId string) (count int64, err error, errCode int)
 	ImportTypeUsage(ctx context.Context, jwt jwt.Token, importTypeId string) (usage model.ImportTypeUsage, err error, errCode int)
 }

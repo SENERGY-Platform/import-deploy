@@ -167,6 +167,10 @@ paths:
           type: string
         name: ids
         type: array
+      - description: Get only the instances of this import type
+        in: query
+        name: import_type_id
+        type: string
       produces:
       - application/json
       responses:
@@ -345,6 +349,10 @@ paths:
         in: query
         name: exclude_generated
         type: boolean
+      - description: Count only the instances of this import type
+        in: query
+        name: import_type_id
+        type: string
       produces:
       - text/plain
       responses:

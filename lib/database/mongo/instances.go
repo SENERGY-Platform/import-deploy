@@ -150,10 +150,10 @@ func (this *Mongo) GetInstance(ctx context.Context, id string, jwt jwt.Token) (i
 }
 
 func (this *Mongo) AdminListInstances(ctx context.Context, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool) (result []model.Instance, err error) {
-	return this.listInstances(ctx, limit, offset, sort, asc, search, includeGenerated, []string{}, true)
+	return this.listInstances(ctx, limit, offset, sort, asc, search, includeGenerated, []string{}, true, "")
 }
 
-func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool, requestedIds []string) (result []model.Instance, err error) {
+func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64, sort string, jwt jwt.Token, asc bool, search string, includeGenerated bool, requestedIds []string, importTypeId string) (result []model.Instance, err error) {
 	ids, err, _ := this.perm.ListAccessibleResourceIdsContext(ctx, jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
 	if err != nil {
 		return nil, err
@@ -168,10 +168,10 @@ func (this *Mongo) ListInstances(ctx context.Context, limit int64, offset int64,
 		ids = mergedIds
 	}
 
-	return this.listInstances(ctx, limit, offset, sort, asc, search, includeGenerated, ids, false)
+	return this.listInstances(ctx, limit, offset, sort, asc, search, includeGenerated, ids, false, importTypeId)
 }
 
-func (this *Mongo) listInstances(ctx context.Context, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string, ignoreIdFilter bool) (result []model.Instance, err error) {
+func (this *Mongo) listInstances(ctx context.Context, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string, ignoreIdFilter bool, importTypeId string) (result []model.Instance, err error) {
 	opt := options.Find()
 	if limit != -1 {
 		opt.SetLimit(limit)
@@ -212,6 +212,9 @@ func (this *Mongo) listInstances(ctx context.Context, limit int64, offset int64,
 	}
 	if !ignoreIdFilter {
 		filter[idKey] = bson.M{"$in": ids}
+	}
+	if importTypeId != "" {
+		filter[importTypeIdKey] = importTypeId
 	}
 	cursor, err := this.instanceCollection().Find(ctx, filter, opt)
 	if err != nil {
@@ -305,12 +308,15 @@ func (this *Mongo) RemoveInstance(ctx context.Context, id string, jwt jwt.Token)
 	return err
 }
 
-func (this *Mongo) CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (int64, error) {
+func (this *Mongo) CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool, importTypeId string) (int64, error) {
 	ids, err, _ := this.perm.ListAccessibleResourceIdsContext(ctx, jwt.Token, model.PermV2InstanceTopic, permV2Client.ListOptions{}, permV2Client.Read)
 	if err != nil {
 		return 0, err
 	}
 	filter := bson.D{{Key: idKey, Value: bson.M{"$in": ids}}}
+	if importTypeId != "" {
+		filter = append(filter, primitive.E{Key: importTypeIdKey, Value: importTypeId})
+	}
 	if includeGenerated {
 		filter = append(filter, primitive.E{Key: nameKey, Value: primitive.Regex{
 			Pattern: ".*" + search + ".*",

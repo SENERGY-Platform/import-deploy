@@ -52,6 +52,7 @@ func InstancesEndpoints(_ config.Config, control Controller, router *gin.Engine)
 // @Param search query string false "Free-text search term"
 // @Param exclude_generated query bool false "If true, excludes generated instances"
 // @Param ids query []string false "Get only specific instances by id (comma-separated list)"
+// @Param import_type_id query string false "Get only the instances of this import type"
 // @Success 200 {array} model.Instance
 // @Failure 400 {string} ErrorResponse
 // @Failure 403 {string} ErrorResponse
@@ -97,7 +98,7 @@ func listInstancesHandler(control Controller) gin.HandlerFunc {
 		}
 
 		includeGenerated := strings.ToLower(c.Query("exclude_generated")) != "true"
-		results, err, errCode := control.ListInstances(c.Request.Context(), token, limitInt, offsetInt, orderBy, asc, search, includeGenerated, ids)
+		results, err, errCode := control.ListInstances(c.Request.Context(), token, limitInt, offsetInt, orderBy, asc, search, includeGenerated, ids, c.Query("import_type_id"))
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return
@@ -113,6 +114,7 @@ func listInstancesHandler(control Controller) gin.HandlerFunc {
 // @Produce plain
 // @Param search query string false "Free-text search term"
 // @Param exclude_generated query bool false "If true, excludes generated instances"
+// @Param import_type_id query string false "Count only the instances of this import type"
 // @Success 200 {string} string
 // @Failure 400 {string} ErrorResponse
 // @Failure 403 {string} ErrorResponse
@@ -129,7 +131,7 @@ func countInstancesHandler(control Controller) gin.HandlerFunc {
 		search := c.Query("search")
 		includeGenerated := strings.ToLower(c.Query("exclude_generated")) != "true"
 
-		count, err, errCode := control.CountInstances(c.Request.Context(), token, search, includeGenerated)
+		count, err, errCode := control.CountInstances(c.Request.Context(), token, search, includeGenerated, c.Query("import_type_id"))
 		if err != nil {
 			_ = c.Error(errors.Join(model.GetError(errCode), err))
 			return

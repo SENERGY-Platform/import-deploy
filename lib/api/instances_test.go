@@ -33,6 +33,19 @@ type recordingController struct {
 	Controller
 	created *model.Instance
 	set     *model.Instance
+	// the import type a list or count was narrowed to, nil until asked
+	listedType  *string
+	countedType *string
+}
+
+func (c *recordingController) ListInstances(_ context.Context, _ jwt.Token, _ int64, _ int64, _ string, _ bool, _ string, _ bool, _ []string, importTypeId string) ([]model.Instance, error, int) {
+	c.listedType = &importTypeId
+	return []model.Instance{}, nil, http.StatusOK
+}
+
+func (c *recordingController) CountInstances(_ context.Context, _ jwt.Token, _ string, _ bool, importTypeId string) (int64, error, int) {
+	c.countedType = &importTypeId
+	return 0, nil, http.StatusOK
 }
 
 func (c *recordingController) CreateInstance(_ context.Context, instance model.Instance, _ jwt.Token) (model.Instance, error, int) {
@@ -75,5 +88,35 @@ func TestInstanceBodiesAreJSONWithoutAContentType(t *testing.T) {
 			t.Fatalf("Content-Type %q: set got %+v", contentType, control.set)
 		}
 		control.created, control.set = nil, nil
+	}
+}
+
+// The import types list links to the imports of one type; without the parameter nothing is narrowed.
+func TestListAndCountPassTheImportType(t *testing.T) {
+	control := &recordingController{}
+	router := gin.New()
+	router.GET("/instances", listInstancesHandler(control))
+	router.GET("/total/instances", countInstancesHandler(control))
+	for _, importTypeId := range []string{"urn:infai:ses:import-type:t", ""} {
+		query := ""
+		if importTypeId != "" {
+			query = "?import_type_id=" + importTypeId
+		}
+		for _, path := range []string{"/instances", "/total/instances"} {
+			req := httptest.NewRequest(http.MethodGet, path+query, nil)
+			req.Header.Set("Authorization", tokenWithUsername(t, "someone"))
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, req)
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("GET %s answered %d: %s", path+query, recorder.Code, recorder.Body.String())
+			}
+		}
+		if control.listedType == nil || *control.listedType != importTypeId {
+			t.Errorf("list with %q got %v", query, control.listedType)
+		}
+		if control.countedType == nil || *control.countedType != importTypeId {
+			t.Errorf("count with %q got %v", query, control.countedType)
+		}
+		control.listedType, control.countedType = nil, nil
 	}
 }

@@ -149,6 +149,12 @@ const docTemplate = `{
                         "description": "Get only specific instances by id (comma-separated list)",
                         "name": "ids",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Get only the instances of this import type",
+                        "name": "import_type_id",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -414,6 +420,12 @@ const docTemplate = `{
                         "type": "boolean",
                         "description": "If true, excludes generated instances",
                         "name": "exclude_generated",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Count only the instances of this import type",
+                        "name": "import_type_id",
                         "in": "query"
                     }
                 ],

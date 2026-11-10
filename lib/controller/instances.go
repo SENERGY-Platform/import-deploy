@@ -40,10 +40,10 @@ import (
 const idPrefix = "urn:infai:ses:import:"
 const containerNamePrefix = "import-"
 
-func (this *Controller) ListInstances(ctx context.Context, jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string) (results []model.Instance, err error, errCode int) {
+func (this *Controller) ListInstances(ctx context.Context, jwt jwt.Token, limit int64, offset int64, sort string, asc bool, search string, includeGenerated bool, ids []string, importTypeId string) (results []model.Instance, err error, errCode int) {
 	dbCtx, cf := util.GetTimeoutContext(ctx)
 	defer cf()
-	results, err = this.db.ListInstances(dbCtx, limit, offset, sort, jwt, asc, search, includeGenerated, ids)
+	results, err = this.db.ListInstances(dbCtx, limit, offset, sort, jwt, asc, search, includeGenerated, ids, importTypeId)
 	if err != nil {
 		return results, err, http.StatusInternalServerError
 	}
@@ -74,10 +74,10 @@ func (this *Controller) addStatuses(ctx context.Context, instances []model.Insta
 	}
 }
 
-func (this *Controller) CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool) (count int64, err error, errCode int) {
+func (this *Controller) CountInstances(ctx context.Context, jwt jwt.Token, search string, includeGenerated bool, importTypeId string) (count int64, err error, errCode int) {
 	ctx, cf := util.GetTimeoutContext(ctx)
 	defer cf()
-	count, err = this.db.CountInstances(ctx, jwt, search, includeGenerated)
+	count, err = this.db.CountInstances(ctx, jwt, search, includeGenerated, importTypeId)
 	if err != nil {
 		return count, err, http.StatusInternalServerError
 	}
@@ -299,7 +299,7 @@ func (this *Controller) EnsureAllInstancesDeployed(ctx context.Context) (err err
 	var batchSize int64 = 100
 	for {
 		dbCtx, cf := util.GetTimeoutContext(ctx)
-		instances, err := this.db.ListInstances(dbCtx, batchSize, offset, "name", jwt.Token{Token: permV2Client.InternalAdminToken}, true, "", true, []string{})
+		instances, err := this.db.ListInstances(dbCtx, batchSize, offset, "name", jwt.Token{Token: permV2Client.InternalAdminToken}, true, "", true, []string{}, "")
 		cf()
 		if err != nil {
 			return err
